@@ -1,0 +1,38 @@
+[package]
+name = "rapira"
+version = "0.1.0"
+authors = ["Rail Khusnutdinov <rail@33.run>"]
+keywords = ["serialization"]
+categories = []
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/libfunc/rapira/"
+documentation = "https://docs.rs/rapira/"
+repository = "https://github.com/libfunc/rapira/"
+readme = "README.md"
+edition = "2021"
+
+[lib]
+name = "rapira"
+path = "src/lib.rs"
+
+[features]
+default = ["zerocopy", "std"]
+# default = ["zerocopy", "alloc"]
+# default = ["zerocopy"]
+# default = []
+std = ["thiserror", "alloc"]
+alloc = []
+no_std = []
+
+[dependencies.rapira-derive]
+path = "../rapira-derive"
+
+[dependencies]
+thiserror = { version = "1.0", optional = true }
+hashbrown = { version = "0.12", optional = true }
+rustc-hash = { version = "1.1", optional = true, default-features = false }
+zerocopy = { version = "0.6.1", optional = true, features = ["simd"] }
+
+[dependencies.time]
+version = "0.3"
+default-features = false
