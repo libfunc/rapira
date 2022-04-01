@@ -1,0 +1,6 @@
+{
+    "workbench.preferredLightColorTheme": "Verdigris Light",
+    "rust-analyzer.hoverActions.enable": false,
+    "rust-analyzer.lens.enumVariantReferences": true,
+    "workbench.colorTheme": "Verdigris Light",
+}

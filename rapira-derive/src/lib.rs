@@ -195,7 +195,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
 
                             #[inline]
-                            fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                            fn from_slice(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
                             {
@@ -206,7 +206,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             }
 
                             #[inline]
-                            fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                            fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
                             {
@@ -217,7 +217,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             }
 
                             #[inline]
-                            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
                             {
@@ -296,7 +296,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
 
                             #[inline]
-                            fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                            fn from_slice(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
                             {
@@ -305,7 +305,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             }
 
                             #[inline]
-                            fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                            fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
                             {
@@ -314,7 +314,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             }
 
                             #[inline]
-                            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
                             {
@@ -346,7 +346,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             const STATIC_SIZE: Option<usize> = Some(0);
 
                             #[inline]
-                            fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                            fn from_slice(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
                             {
@@ -354,7 +354,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             }
 
                             #[inline]
-                            fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                            fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
                             {
@@ -362,7 +362,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             }
 
                             #[inline]
-                            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
                             {
@@ -395,7 +395,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                         const STATIC_SIZE: Option<usize> = Some(1);
 
                         #[inline]
-                        fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                        fn from_slice(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                         where
                             Self: Sized,
                         {
@@ -404,7 +404,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                         }
 
                         #[inline]
-                        fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                        fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                         where
                             Self: Sized,
                         {
@@ -413,7 +413,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                         }
 
                         #[inline]
-                        unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                        unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                         where
                             Self: Sized,
                         {
@@ -571,7 +571,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                         const STATIC_SIZE: Option<usize> = rapira::enum_size([#(#enum_sizes)*]);
 
                         #[inline]
-                        fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                        fn from_slice(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                         where
                             Self: Sized,
                         {
@@ -583,7 +583,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                         }
 
                         #[inline]
-                        fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                        fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                         where
                             Self: Sized,
                         {
@@ -595,7 +595,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                         }
 
                         #[inline]
-                        unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+                        unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                         where
                             Self: Sized,
                         {

@@ -1,7 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+// #[cfg(feature = "std")]
+// use std::{collections::HashMap, hash::Hash, net::IpAddr};
+
 #[cfg(feature = "std")]
-use std::{collections::HashMap, hash::Hash, net::IpAddr};
+use std::net::IpAddr;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -20,6 +23,9 @@ use thiserror::Error;
 
 #[cfg(feature = "zerocopy")]
 use zerocopy::{AsBytes, FromBytes};
+
+#[cfg(feature = "json")]
+use serde_json::{Map, Number, Value};
 
 #[cfg_attr(feature = "std", derive(Error, Debug))]
 pub enum RapiraError {
@@ -1021,9 +1027,7 @@ impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
     }
 }
 
-impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira
-    for (T0, T1, T2)
-{
+impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
     const STATIC_SIZE: Option<usize> =
         static_size([T0::STATIC_SIZE, T1::STATIC_SIZE, T2::STATIC_SIZE]);
 
@@ -1094,9 +1098,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira
     }
 }
 
-impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira>
-    Rapira for (T0, T1, T2, T3)
-{
+impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3) {
     const STATIC_SIZE: Option<usize> = static_size([
         T0::STATIC_SIZE,
         T1::STATIC_SIZE,
@@ -1264,96 +1266,97 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<K: Rapira, V: Rapira> Rapira for HashMap<K, V>
-where
-    K: Eq + Hash,
-{
-    #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
-    where
-        Self: Sized,
-    {
-        let len = get_u32(slice)? as usize;
-        let mut map = HashMap::<K, V>::new();
-        for _ in 0..len {
-            let key = K::from_slice(slice)?;
-            let value = V::from_slice(slice)?;
-            map.insert(key, value);
-        }
-        Ok(map)
-    }
+// TODO: only for hash который всегда одинаковый результат возвращает!!!
+// #[cfg(feature = "std")]
+// impl<K: Rapira, V: Rapira, S> Rapira for HashMap<K, V, S>
+// where
+//     K: Eq + Hash,
+// {
+//     #[inline]
+//     fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+//     where
+//         Self: Sized,
+//     {
+//         let len = get_u32(slice)? as usize;
+//         let mut map = HashMap::<K, V, S>::default();
+//         for _ in 0..len {
+//             let key = K::from_slice(slice)?;
+//             let value = V::from_slice(slice)?;
+//             map.insert(key, value);
+//         }
+//         Ok(map)
+//     }
 
-    #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
-    where
-        Self: Sized,
-    {
-        let len = get_u32(slice)? as usize;
-        let mut map = HashMap::<K, V>::new();
-        for _ in 0..len {
-            let key = K::from_slice_unchecked(slice)?;
-            let value = V::from_slice_unchecked(slice)?;
-            map.insert(key, value);
-        }
-        Ok(map)
-    }
+//     #[inline]
+//     fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+//     where
+//         Self: Sized,
+//     {
+//         let len = get_u32(slice)? as usize;
+//         let mut map = HashMap::<K, V, S>::new();
+//         for _ in 0..len {
+//             let key = K::from_slice_unchecked(slice)?;
+//             let value = V::from_slice_unchecked(slice)?;
+//             map.insert(key, value);
+//         }
+//         Ok(map)
+//     }
 
-    #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
-    where
-        Self: Sized,
-    {
-        let len = get_u32_unsafe(slice) as usize;
-        let mut map = HashMap::<K, V>::new();
-        for _ in 0..len {
-            let key = K::from_slice_unsafe(slice)?;
-            let value = V::from_slice_unsafe(slice)?;
-            map.insert(key, value);
-        }
-        Ok(map)
-    }
+//     #[inline]
+//     unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+//     where
+//         Self: Sized,
+//     {
+//         let len = get_u32_unsafe(slice) as usize;
+//         let mut map = HashMap::<K, V, S>::new();
+//         for _ in 0..len {
+//             let key = K::from_slice_unsafe(slice)?;
+//             let value = V::from_slice_unsafe(slice)?;
+//             map.insert(key, value);
+//         }
+//         Ok(map)
+//     }
 
-    #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
-        let len = self.len() as u32;
-        len.try_convert_to_bytes(slice, cursor)?;
-        for (key, value) in self {
-            key.try_convert_to_bytes(slice, cursor)?;
-            value.try_convert_to_bytes(slice, cursor)?;
-        }
-        Ok(())
-    }
+//     #[inline]
+//     fn try_convert_to_bytes(
+//         &self,
+//         slice: &mut [u8],
+//         cursor: &mut usize,
+//     ) -> Result<(), RapiraError> {
+//         let len = self.len() as u32;
+//         len.try_convert_to_bytes(slice, cursor)?;
+//         for (key, value) in self {
+//             key.try_convert_to_bytes(slice, cursor)?;
+//             value.try_convert_to_bytes(slice, cursor)?;
+//         }
+//         Ok(())
+//     }
 
-    #[inline]
-    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        let len = self.len() as u32;
-        len.convert_to_bytes(slice, cursor);
-        for (key, value) in self {
-            key.convert_to_bytes(slice, cursor);
-            value.convert_to_bytes(slice, cursor);
-        }
-    }
+//     #[inline]
+//     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+//         let len = self.len() as u32;
+//         len.convert_to_bytes(slice, cursor);
+//         for (key, value) in self {
+//             key.convert_to_bytes(slice, cursor);
+//             value.convert_to_bytes(slice, cursor);
+//         }
+//     }
 
-    #[inline]
-    fn size(&self) -> usize {
-        if let Some(k) = K::STATIC_SIZE {
-            if let Some(v) = V::STATIC_SIZE {
-                4 + (self.len() * (k + v))
-            } else {
-                4 + (k * self.len()) + self.iter().fold(0, |b, (_, v)| b + v.size())
-            }
-        } else {
-            4 + self.iter().fold(0, |b, (k, v)| {
-                b + k.size() + V::STATIC_SIZE.unwrap_or_else(|| v.size())
-            })
-        }
-    }
-}
+//     #[inline]
+//     fn size(&self) -> usize {
+//         if let Some(k) = K::STATIC_SIZE {
+//             if let Some(v) = V::STATIC_SIZE {
+//                 4 + (self.len() * (k + v))
+//             } else {
+//                 4 + (k * self.len()) + self.iter().fold(0, |b, (_, v)| b + v.size())
+//             }
+//         } else {
+//             4 + self.iter().fold(0, |b, (k, v)| {
+//                 b + k.size() + V::STATIC_SIZE.unwrap_or_else(|| v.size())
+//             })
+//         }
+//     }
+// }
 
 #[cfg(feature = "std")]
 impl Rapira for IpAddr {
@@ -1464,9 +1467,7 @@ impl<T: FromBytes + AsBytes + Sized> Rapira for ZeroCopy<T> {
         Self: Sized,
     {
         let size = size_of::<T>();
-        let bytes: &[u8] = slice
-            .get(..size)
-            .ok_or(RapiraError::SliceLenError)?;
+        let bytes: &[u8] = slice.get(..size).ok_or(RapiraError::SliceLenError)?;
 
         *slice = unsafe { slice.get_unchecked(4..) };
 
@@ -1497,5 +1498,210 @@ impl<T: FromBytes + AsBytes + Sized> Rapira for ZeroCopy<T> {
     #[inline]
     fn size(&self) -> usize {
         size_of::<T>()
+    }
+}
+
+#[cfg(feature = "json")]
+impl Rapira for Value {
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let byte = u8::from_slice(slice)?;
+        if byte == 0 {
+            Ok(Value::Null)
+        } else if byte == 1 {
+            let b = bool::from_slice(slice)?;
+            Ok(Value::Bool(b))
+        } else if byte == 2 {
+            let byte = u8::from_slice(slice)?;
+            if byte == 0 {
+                let u = u64::from_slice(slice)?;
+                Ok(Value::Number(u.into()))
+            } else if byte == 1 {
+                let i = i64::from_slice(slice)?;
+                Ok(Value::Number(i.into()))
+            } else if byte == 2 {
+                let f = f64::from_slice(slice)?;
+                let number = Number::from_f64(f).ok_or(RapiraError::FloatIsNaNError)?;
+                Ok(Value::Number(number))
+            } else {
+                Err(RapiraError::EnumVariantError)
+            }
+        } else if byte == 3 {
+            let s = String::from_slice(slice)?;
+            Ok(Value::String(s))
+        } else if byte == 4 {
+            let vec = Vec::<Value>::from_slice(slice)?;
+            Ok(Value::Array(vec))
+        } else if byte == 5 {
+            let len = get_u32(slice)? as usize;
+            let mut map = Map::new();
+            for _ in 0..len {
+                let key = String::from_slice(slice)?;
+                let val = Value::from_slice(slice)?;
+                map.insert(key, val);
+            }
+            Ok(Value::Object(map))
+        } else {
+            Err(RapiraError::EnumVariantError)
+        }
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let byte = u8::from_slice_unsafe(slice)?;
+        if byte == 0 {
+            Ok(Value::Null)
+        } else if byte == 1 {
+            let b = bool::from_slice_unsafe(slice)?;
+            Ok(Value::Bool(b))
+        } else if byte == 2 {
+            let byte = u8::from_slice_unsafe(slice)?;
+            if byte == 0 {
+                let u = u64::from_slice_unsafe(slice)?;
+                Ok(Value::Number(u.into()))
+            } else if byte == 1 {
+                let i = i64::from_slice_unsafe(slice)?;
+                Ok(Value::Number(i.into()))
+            } else if byte == 2 {
+                let f = f64::from_slice_unsafe(slice)?;
+                let number = Number::from_f64(f).ok_or(RapiraError::FloatIsNaNError)?;
+                Ok(Value::Number(number))
+            } else {
+                Err(RapiraError::EnumVariantError)
+            }
+        } else if byte == 3 {
+            let s = String::from_slice_unsafe(slice)?;
+            Ok(Value::String(s))
+        } else if byte == 4 {
+            let vec = Vec::<Value>::from_slice_unsafe(slice)?;
+            Ok(Value::Array(vec))
+        } else if byte == 5 {
+            let len = get_u32(slice)? as usize;
+            let mut map = Map::new();
+            for _ in 0..len {
+                let key = String::from_slice_unsafe(slice)?;
+                let val = Value::from_slice_unsafe(slice)?;
+                map.insert(key, val);
+            }
+            Ok(Value::Object(map))
+        } else {
+            Err(RapiraError::EnumVariantError)
+        }
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        match self {
+            Value::Null => {
+                push(slice, cursor, 0);
+            }
+            Value::Bool(v) => {
+                push(slice, cursor, 1);
+                v.convert_to_bytes(slice, cursor);
+            }
+            Value::Number(n) => {
+                push(slice, cursor, 2);
+                if let Some(u) = n.as_u64() {
+                    push(slice, cursor, 0);
+                    u.convert_to_bytes(slice, cursor);
+                } else if let Some(i) = n.as_i64() {
+                    push(slice, cursor, 1);
+                    i.convert_to_bytes(slice, cursor);
+                } else if let Some(f) = n.as_f64() {
+                    push(slice, cursor, 2);
+                    f.convert_to_bytes(slice, cursor);
+                }
+            }
+            Value::String(s) => {
+                push(slice, cursor, 3);
+                s.convert_to_bytes(slice, cursor);
+            }
+            Value::Array(a) => {
+                push(slice, cursor, 4);
+                a.convert_to_bytes(slice, cursor);
+            }
+            Value::Object(o) => {
+                push(slice, cursor, 5);
+                let size: u32 = o.len() as u32;
+                size.convert_to_bytes(slice, cursor);
+                o.iter().for_each(|(k, v)| {
+                    k.convert_to_bytes(slice, cursor);
+                    v.convert_to_bytes(slice, cursor);
+                });
+            }
+        }
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(
+        &self,
+        slice: &mut [u8],
+        cursor: &mut usize,
+    ) -> Result<(), RapiraError> {
+        match self {
+            Value::Null => {
+                push(slice, cursor, 0);
+            }
+            Value::Bool(v) => {
+                push(slice, cursor, 1);
+                v.convert_to_bytes(slice, cursor);
+            }
+            Value::Number(n) => {
+                push(slice, cursor, 2);
+                if let Some(u) = n.as_u64() {
+                    push(slice, cursor, 0);
+                    u.convert_to_bytes(slice, cursor);
+                } else if let Some(i) = n.as_i64() {
+                    push(slice, cursor, 1);
+                    i.convert_to_bytes(slice, cursor);
+                } else if let Some(f) = n.as_f64() {
+                    push(slice, cursor, 2);
+                    if f.is_infinite() {
+                        return Err(RapiraError::FloatIsNaNError);
+                    }
+                    f.try_convert_to_bytes(slice, cursor)?;
+                }
+            }
+            Value::String(s) => {
+                push(slice, cursor, 3);
+                s.convert_to_bytes(slice, cursor);
+            }
+            Value::Array(a) => {
+                push(slice, cursor, 4);
+                a.try_convert_to_bytes(slice, cursor)?;
+            }
+            Value::Object(o) => {
+                push(slice, cursor, 5);
+                let size: u32 = o.len() as u32;
+                size.convert_to_bytes(slice, cursor);
+                for (k, v) in o.iter() {
+                    k.convert_to_bytes(slice, cursor);
+                    v.try_convert_to_bytes(slice, cursor)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        1 + match self {
+            Value::Null => 0,
+            Value::Bool(_) => 1,
+            Value::Number(_) => 1 + 8,
+            Value::String(s) => s.size(),
+            Value::Array(vec) => 4 + vec.iter().fold(0, |acc, item| acc + item.size()),
+            Value::Object(v) => {
+                4 + v
+                    .iter()
+                    .fold(0, |acc, item| acc + item.0.size() + item.1.size())
+            }
+        }
     }
 }
