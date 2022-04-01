@@ -309,17 +309,6 @@ impl_for_integer!(u64);
 impl_for_integer!(u128);
 
 #[inline]
-pub fn get_u32(slice: &mut &[u8]) -> Result<u32, RapiraError> {
-    let bytes: &[u8; 4] = slice
-        .get(..4)
-        .ok_or(RapiraError::SliceLenError)?
-        .try_into()
-        .unwrap();
-    *slice = unsafe { slice.get_unchecked(4..) };
-    Ok(u32::from_le_bytes(*bytes))
-}
-
-#[inline]
 pub unsafe fn get_u32_unsafe(slice: &mut &[u8]) -> u32 {
     let bytes: &[u8] = slice.get_unchecked(..4);
 
@@ -512,7 +501,7 @@ impl Rapira for String {
     where
         Self: Sized,
     {
-        let len = get_u32(slice)? as usize;
+        let len = u32::from_slice(slice)? as usize;
         let vec = Vec::from(&slice[..len]);
         let s = String::from_utf8(vec).map_err(|_| RapiraError::StringTypeError)?;
 
@@ -525,7 +514,7 @@ impl Rapira for String {
     where
         Self: Sized,
     {
-        let len = get_u32(slice)? as usize;
+        let len = u32::from_slice(slice)? as usize;
         let vec = Vec::from(&slice[..len]);
         let s = unsafe { String::from_utf8_unchecked(vec) };
 
@@ -593,7 +582,7 @@ impl Rapira for Bytes {
     where
         Self: Sized,
     {
-        let len = get_u32(slice)? as usize;
+        let len = u32::from_slice(slice)? as usize;
         let vec = Vec::from(&slice[..len]);
 
         *slice = unsafe { slice.get_unchecked(len..) };
@@ -697,7 +686,7 @@ impl<T: Rapira> Rapira for Vec<T> {
     where
         Self: Sized,
     {
-        let len = get_u32(slice)? as usize;
+        let len = u32::from_slice(slice)? as usize;
         let mut vec: Vec<T> = Vec::with_capacity(len);
 
         for _ in 0..len {
@@ -713,7 +702,7 @@ impl<T: Rapira> Rapira for Vec<T> {
     where
         Self: Sized,
     {
-        let len = get_u32(slice)? as usize;
+        let len = u32::from_slice(slice)? as usize;
         let mut vec: Vec<T> = Vec::with_capacity(len);
 
         for _ in 0..len {
@@ -1188,7 +1177,7 @@ where
 {
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError> {
-        let len = get_u32(slice)? as usize;
+        let len = u32::from_slice(slice)? as usize;
         let mut map = BTreeMap::<K, V>::new();
         for _ in 0..len {
             let key = K::from_slice(slice)?;
@@ -1200,7 +1189,7 @@ where
 
     #[inline]
     fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError> {
-        let len = get_u32(slice)? as usize;
+        let len = u32::from_slice(slice)? as usize;
         let mut map = BTreeMap::<K, V>::new();
         for _ in 0..len {
             let key = K::from_slice_unchecked(slice)?;
@@ -1277,7 +1266,7 @@ where
 //     where
 //         Self: Sized,
 //     {
-//         let len = get_u32(slice)? as usize;
+//         let len = u32::from_slice(slice)? as usize;
 //         let mut map = HashMap::<K, V, S>::default();
 //         for _ in 0..len {
 //             let key = K::from_slice(slice)?;
@@ -1292,7 +1281,7 @@ where
 //     where
 //         Self: Sized,
 //     {
-//         let len = get_u32(slice)? as usize;
+//         let len = u32::from_slice(slice)? as usize;
 //         let mut map = HashMap::<K, V, S>::new();
 //         for _ in 0..len {
 //             let key = K::from_slice_unchecked(slice)?;
@@ -1536,7 +1525,7 @@ impl Rapira for Value {
             let vec = Vec::<Value>::from_slice(slice)?;
             Ok(Value::Array(vec))
         } else if byte == 5 {
-            let len = get_u32(slice)? as usize;
+            let len = u32::from_slice(slice)? as usize;
             let mut map = Map::new();
             for _ in 0..len {
                 let key = String::from_slice(slice)?;
@@ -1582,7 +1571,7 @@ impl Rapira for Value {
             let vec = Vec::<Value>::from_slice_unsafe(slice)?;
             Ok(Value::Array(vec))
         } else if byte == 5 {
-            let len = get_u32(slice)? as usize;
+            let len = get_u32_unsafe(slice) as usize;
             let mut map = Map::new();
             for _ in 0..len {
                 let key = String::from_slice_unsafe(slice)?;
