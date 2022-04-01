@@ -6,6 +6,9 @@
 #[cfg(feature = "std")]
 use std::net::IpAddr;
 
+#[cfg(feature = "std")]
+use anyhow::Error;
+
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
@@ -45,8 +48,9 @@ pub enum RapiraError {
     SliceLenError,
     #[cfg_attr(feature = "std", error("from arr not implemented"))]
     FromArrNotImplemented,
-    // #[cfg_attr(feature = "std", error(transparent))]
-    // OtherError(#[from] Error),
+    #[cfg(feature = "std")]
+    #[cfg_attr(feature = "std", error(transparent))]
+    OtherError(#[from] Error),
 }
 
 pub trait Rapira {
