@@ -400,7 +400,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             Self: Sized,
                         {
                             let val: u8 = u8::from_slice(slice)?;
-                            Self::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)
+                            <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)
                         }
 
                         #[inline]
@@ -409,7 +409,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             Self: Sized,
                         {
                             let val: u8 = u8::from_slice(slice)?;
-                            Self::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)
+                            <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)
                         }
 
                         #[inline]
@@ -418,7 +418,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             Self: Sized,
                         {
                             let val: u8 = u8::from_slice_unsafe(slice)?;
-                            Self::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)
+                            <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)
                         }
 
                         #[inline]
@@ -576,7 +576,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             Self: Sized,
                         {
                             let val: u8 = u8::from_slice(slice)?;
-                            let t = #primitive_name::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                            let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
                             match t {
                                 #(#from_slice)*
                             }
@@ -588,7 +588,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             Self: Sized,
                         {
                             let val: u8 = u8::from_slice(slice)?;
-                            let t = #primitive_name::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                            let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
                             match t {
                                 #(#from_slice_unchecked)*
                             }
@@ -600,7 +600,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             Self: Sized,
                         {
                             let val: u8 = u8::from_slice_unsafe(slice)?;
-                            let t = #primitive_name::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                            let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
                             match t {
                                 #(#from_slice_unsafe)*
                             }
