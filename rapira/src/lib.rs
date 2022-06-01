@@ -92,8 +92,6 @@ pub trait Rapira {
             Some(s) => s,
             None => self.size(),
         };
-        // println!("value_size: {value_size}");
-        // let mut bytes: Vec<u8> = Vec::<u8>::with_capacity(value_size);
         let mut bytes: Vec<u8> = vec![0u8; value_size];
         let mut cursor = 0usize;
         self.convert_to_bytes(&mut bytes, &mut cursor);
@@ -1431,7 +1429,7 @@ pub const fn enum_size<const N: usize>(arr: [Option<usize>; N]) -> Option<usize>
         i += 1;
     }
     if is_static {
-        Some(size)
+        Some(size + 1)
     } else {
         None
     }
