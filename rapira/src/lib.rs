@@ -1,13 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-// #[cfg(feature = "std")]
-// use std::{collections::HashMap, hash::Hash, net::IpAddr};
-
 #[cfg(feature = "std")]
 use std::net::IpAddr;
-
-#[cfg(feature = "std")]
-use anyhow::Error;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -23,6 +17,12 @@ use core::ops::Deref;
 pub use rapira_derive::Rapira;
 #[cfg(feature = "std")]
 use thiserror::Error;
+
+#[cfg(feature = "map")]
+use indexmap::IndexMap;
+
+#[cfg(feature = "map")]
+use core::hash::BuildHasherDefault;
 
 #[cfg(feature = "zerocopy")]
 use zerocopy::{AsBytes, FromBytes};
@@ -49,8 +49,8 @@ pub enum RapiraError {
     #[cfg_attr(feature = "std", error("from arr not implemented"))]
     FromArrNotImplemented,
     #[cfg(feature = "std")]
-    #[cfg_attr(feature = "std", error(transparent))]
-    OtherError(#[from] Error),
+    #[cfg_attr(feature = "std", error("other error: {0}"))]
+    OtherError(String),
 }
 
 pub trait Rapira {
@@ -428,7 +428,6 @@ impl Rapira for f32 {
     }
 }
 
-// TODO: is nan?
 impl Rapira for f64 {
     const STATIC_SIZE: Option<usize> = Some(8);
 
@@ -1257,97 +1256,98 @@ where
     }
 }
 
-// TODO: only for hash который всегда одинаковый результат возвращает!!!
-// #[cfg(feature = "std")]
-// impl<K: Rapira, V: Rapira, S> Rapira for HashMap<K, V, S>
-// where
-//     K: Eq + Hash,
-// {
-//     #[inline]
-//     fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
-//     where
-//         Self: Sized,
-//     {
-//         let len = u32::from_slice(slice)? as usize;
-//         let mut map = HashMap::<K, V, S>::default();
-//         for _ in 0..len {
-//             let key = K::from_slice(slice)?;
-//             let value = V::from_slice(slice)?;
-//             map.insert(key, value);
-//         }
-//         Ok(map)
-//     }
-
-//     #[inline]
-//     fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
-//     where
-//         Self: Sized,
-//     {
-//         let len = u32::from_slice(slice)? as usize;
-//         let mut map = HashMap::<K, V, S>::new();
-//         for _ in 0..len {
-//             let key = K::from_slice_unchecked(slice)?;
-//             let value = V::from_slice_unchecked(slice)?;
-//             map.insert(key, value);
-//         }
-//         Ok(map)
-//     }
-
-//     #[inline]
-//     unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
-//     where
-//         Self: Sized,
-//     {
-//         let len = get_u32_unsafe(slice) as usize;
-//         let mut map = HashMap::<K, V, S>::new();
-//         for _ in 0..len {
-//             let key = K::from_slice_unsafe(slice)?;
-//             let value = V::from_slice_unsafe(slice)?;
-//             map.insert(key, value);
-//         }
-//         Ok(map)
-//     }
-
-//     #[inline]
-//     fn try_convert_to_bytes(
-//         &self,
-//         slice: &mut [u8],
-//         cursor: &mut usize,
-//     ) -> Result<(), RapiraError> {
-//         let len = self.len() as u32;
-//         len.try_convert_to_bytes(slice, cursor)?;
-//         for (key, value) in self {
-//             key.try_convert_to_bytes(slice, cursor)?;
-//             value.try_convert_to_bytes(slice, cursor)?;
-//         }
-//         Ok(())
-//     }
-
-//     #[inline]
-//     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-//         let len = self.len() as u32;
-//         len.convert_to_bytes(slice, cursor);
-//         for (key, value) in self {
-//             key.convert_to_bytes(slice, cursor);
-//             value.convert_to_bytes(slice, cursor);
-//         }
-//     }
-
-//     #[inline]
-//     fn size(&self) -> usize {
-//         if let Some(k) = K::STATIC_SIZE {
-//             if let Some(v) = V::STATIC_SIZE {
-//                 4 + (self.len() * (k + v))
-//             } else {
-//                 4 + (k * self.len()) + self.iter().fold(0, |b, (_, v)| b + v.size())
-//             }
-//         } else {
-//             4 + self.iter().fold(0, |b, (k, v)| {
-//                 b + k.size() + V::STATIC_SIZE.unwrap_or_else(|| v.size())
-//             })
-//         }
-//     }
-// }
+#[cfg(feature = "map")]
+impl<K: Rapira, V: Rapira, S> Rapira for IndexMap<K, V, BuildHasherDefault<S>>
+where
+    K: Eq + core::hash::Hash,
+    S: core::hash::Hasher + core::default::Default,
+{
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let hasher = BuildHasherDefault::<S>::default();
+        let mut map =
+            IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
+        for _ in 0..len {
+            let key = K::from_slice(slice)?;
+            let value = V::from_slice(slice)?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let hasher = BuildHasherDefault::<S>::default();
+        let mut map =
+            IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
+        for _ in 0..len {
+            let key = K::from_slice_unchecked(slice)?;
+            let value = V::from_slice_unchecked(slice)?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = get_u32_unsafe(slice) as usize;
+        let hasher = BuildHasherDefault::<S>::default();
+        let mut map =
+            IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
+        for _ in 0..len {
+            let key = K::from_slice_unsafe(slice)?;
+            let value = V::from_slice_unsafe(slice)?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+    #[inline]
+    fn try_convert_to_bytes(
+        &self,
+        slice: &mut [u8],
+        cursor: &mut usize,
+    ) -> Result<(), RapiraError> {
+        let len = self.len() as u32;
+        len.try_convert_to_bytes(slice, cursor)?;
+        for (key, value) in self {
+            key.try_convert_to_bytes(slice, cursor)?;
+            value.try_convert_to_bytes(slice, cursor)?;
+        }
+        Ok(())
+    }
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let len = self.len() as u32;
+        len.convert_to_bytes(slice, cursor);
+        for (key, value) in self {
+            key.convert_to_bytes(slice, cursor);
+            value.convert_to_bytes(slice, cursor);
+        }
+    }
+    #[inline]
+    fn size(&self) -> usize {
+        if let Some(k) = K::STATIC_SIZE {
+            if let Some(v) = V::STATIC_SIZE {
+                4 + (self.len() * (k + v))
+            } else {
+                4 + (k * self.len()) + self.iter().fold(0, |b, (_, v)| b + v.size())
+            }
+        } else {
+            4 + self.iter().fold(0, |b, (k, v)| {
+                b + k.size() + V::STATIC_SIZE.unwrap_or_else(|| v.size())
+            })
+        }
+    }
+}
 
 #[cfg(feature = "std")]
 impl Rapira for IpAddr {

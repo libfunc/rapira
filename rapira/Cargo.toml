@@ -16,26 +16,27 @@ name = "rapira"
 path = "src/lib.rs"
 
 [features]
-default = ["zerocopy", "std", "json"]
+default = ["zerocopy", "std", "json", "map"]
 # default = ["zerocopy", "std"]
 # default = ["zerocopy", "alloc"]
 # default = ["zerocopy"]
 # default = []
-std = ["thiserror", "anyhow", "alloc"]
+std = ["thiserror", "alloc"]
 alloc = []
 json = ["serde_json/alloc"]
 no_std = []
+map = ["indexmap"]
 
 [dependencies.rapira-derive]
 path = "../rapira-derive"
 
 [dependencies]
 thiserror = { version = "1.0", optional = true }
-anyhow = {version = "1.0", optional = true }
 hashbrown = { version = "0.12", optional = true }
 rustc-hash = { version = "1.1", optional = true, default-features = false }
 zerocopy = { version = "0.6.1", optional = true, features = ["simd"] }
 serde_json = { version = "1.0", optional = true, default-features = false }
+indexmap = { version = "1.9", optional = true, default-features = false }
 
 [dependencies.time]
 version = "0.3"
