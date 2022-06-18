@@ -16,7 +16,7 @@ name = "rapira"
 path = "src/lib.rs"
 
 [features]
-default = ["zerocopy", "std", "json", "map"]
+default = ["zerocopy", "std", "json"]
 # default = ["zerocopy", "std"]
 # default = ["zerocopy", "alloc"]
 # default = ["zerocopy"]

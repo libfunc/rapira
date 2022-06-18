@@ -36,6 +36,8 @@ pub enum RapiraError {
     IterNextError,
     #[cfg_attr(feature = "std", error("string from utf8 error"))]
     StringTypeError,
+    #[cfg_attr(feature = "std", error("datetime error"))]
+    DatetimeError,
     #[cfg_attr(feature = "std", error("map insert error: args next error"))]
     MapInsertError,
     #[cfg_attr(feature = "std", error("enum variant error"))]
