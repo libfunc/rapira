@@ -271,11 +271,10 @@ macro_rules! impl_for_integer {
             {
                 let bytes: &[u8] = slice.get_unchecked(..size_of::<$type>());
 
-                // TODO
-                // let arr: &[u8; size_of::<$type>()] = bytes.try_into().unwrap();
                 let arr: &[u8; size_of::<$type>()] = core::mem::transmute_copy(&bytes);
-
                 let u = <$type>::from_le_bytes(*arr);
+
+                // let u: $type = core::mem::transmute_copy(bytes);
 
                 *slice = slice.get_unchecked(size_of::<$type>()..);
                 Ok(u)
@@ -316,12 +315,13 @@ impl_for_integer!(u128);
 pub unsafe fn get_u32_unsafe(slice: &mut &[u8]) -> u32 {
     let bytes: &[u8] = slice.get_unchecked(..4);
 
-    // TODO
-    // let arr: &[u8; 4] = bytes.try_into().unwrap();
     let arr: &[u8; 4] = core::mem::transmute_copy(&bytes);
+    let u = u32::from_le_bytes(*arr);
+
+    // let u: u32 = core::mem::transmute_copy(bytes);
 
     *slice = slice.get_unchecked(4..);
-    u32::from_le_bytes(*arr)
+    u
 }
 
 impl Rapira for NonZeroU32 {
@@ -389,8 +389,6 @@ impl Rapira for f32 {
     {
         let bytes: &[u8] = slice.get_unchecked(..4);
 
-        // TODO
-        // let arr: &[u8; 4] = bytes.try_into().unwrap();
         let arr: &[u8; 4] = core::mem::transmute_copy(&bytes);
 
         let u = f32::from_le_bytes(*arr);
@@ -456,8 +454,6 @@ impl Rapira for f64 {
     {
         let bytes: &[u8] = slice.get_unchecked(..8);
 
-        // TODO
-        // let arr: &[u8; 8] = bytes.try_into().unwrap();
         let arr: &[u8; 8] = core::mem::transmute_copy(&bytes);
 
         let u = f64::from_le_bytes(*arr);
@@ -657,8 +653,6 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
     {
         let bytes: &[u8] = slice.get_unchecked(..CAP);
 
-        // TODO
-        // let arr: &[u8; CAP] = bytes.try_into().unwrap();
         let arr: &[u8; CAP] = core::mem::transmute_copy(&bytes);
 
         *slice = slice.get_unchecked(CAP..);
