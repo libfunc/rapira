@@ -1,26 +1,9 @@
-[build]
-#rustflags = ["-C", "link-args=-rdynamic"]
-#rustflags = ["-C", "link-arg=-Wl"]
-#target = "x86_64-unknown-linux-gnu"
-
-[profile.release]
-#debug = false
-#lto = true
-incremental = true
-# "none" (false), "debuginfo", and "symbols" (true)
-strip = true
-
-# https://www.lpalmieri.com/posts/session-based-authentication-in-rust/
-
 # On Windows
 # ```
 # cargo install -f cargo-binutils
 # rustup component add llvm-tools-preview
 # ```
 [target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
-[target.x86_64-pc-windows-gnu]
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 # On Linux:
@@ -30,10 +13,6 @@ rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 linker = "/usr/bin/cc"
 rustflags = ["-C", "linker=clang", "-C", "link-arg=-fuse-ld=lld"]
 
-# On MacOS Intel, `brew install michaeleisel/zld/zld`
-[target.x86_64-apple-darwin]
-rustflags = ["-C", "link-arg=-fuse-ld=/usr/local/bin/zld"]
-
 # On MacOS M1
 [target.aarch64-apple-darwin]
-rustflags = ["-C", "link-arg=-fuse-ld=/usr/local/bin/zld"]
+rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/bin/zld"]
