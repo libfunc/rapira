@@ -133,6 +133,16 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                         })
                         .collect();
 
+                    let check_bytes: Vec<TokenStream> = fields_insert
+                        .iter()
+                        .map(|(field, _)| {
+                            let typ = field.ty.clone();
+                            quote! {
+                                <#typ>::check_bytes(slice)?;
+                            }
+                        })
+                        .collect();
+
                     let from_slice_unchecked: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
@@ -206,6 +216,15 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             }
 
                             #[inline]
+                            fn check_bytes(slice: &mut &[u8]) -> Result<(), rapira::RapiraError>
+                            where
+                                Self: Sized,
+                            {
+                                #(#check_bytes)*
+                                Ok(())
+                            }
+
+                            #[inline]
                             fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                             where
                                 Self: Sized,
@@ -251,6 +270,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let unnamed_len = unnamed.len();
                     let mut field_names: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
                     let mut from_slice: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
+                    let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
                     let mut from_slice_unchecked: Vec<TokenStream> =
                         Vec::with_capacity(unnamed_len);
                     let mut from_slice_unsafe: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
@@ -268,6 +288,9 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
 
                         from_slice.push(quote! {
                             let #field_name = <#typ>::from_slice(slice)?;
+                        });
+                        check_bytes.push(quote! {
+                            <#typ>::check_bytes(slice)?;
                         });
                         from_slice_unchecked.push(quote! {
                             let #field_name = <#typ>::from_slice_unchecked(slice)?;
@@ -302,6 +325,15 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             {
                                 #(#from_slice)*
                                 Ok(#name(#(#field_names)*))
+                            }
+
+                            #[inline]
+                            fn check_bytes(slice: &mut &[u8]) -> Result<(), rapira::RapiraError>
+                            where
+                                Self: Sized,
+                            {
+                                #(#check_bytes)*
+                                Ok(())
                             }
 
                             #[inline]
@@ -351,6 +383,14 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                 Self: Sized,
                             {
                                 Ok(#name)
+                            }
+
+                            #[inline]
+                            fn check_bytes(slice: &mut &[u8]) -> Result<(), rapira::RapiraError>
+                            where
+                                Self: Sized,
+                            {
+                                Ok(())
                             }
 
                             #[inline]
@@ -404,6 +444,16 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                         }
 
                         #[inline]
+                        fn check_bytes(slice: &mut &[u8]) -> Result<(), rapira::RapiraError>
+                        where
+                            Self: Sized,
+                        {
+                            let val: u8 = u8::from_slice(slice)?;
+                            <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError);
+                            Ok(())
+                        }
+
+                        #[inline]
                         fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
                         where
                             Self: Sized,
@@ -441,6 +491,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                 let primitive_name: TokenStream = get_primitive_name(&ast);
 
                 let mut from_slice: Vec<TokenStream> = Vec::with_capacity(variants_len);
+                let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
                 let mut from_slice_unchecked: Vec<TokenStream> = Vec::with_capacity(variants_len);
                 let mut from_slice_unsafe: Vec<TokenStream> = Vec::with_capacity(variants_len);
                 let mut try_convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
@@ -478,6 +529,12 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                 #primitive_name::#variant_name => {
                                     let v = <#typ>::from_slice(slice)?;
                                     Ok(#name::#variant_name(v))
+                                }
+                            });
+
+                            check_bytes.push(quote! {
+                                #primitive_name::#variant_name => {
+                                    <#typ>::check_bytes(slice)?;
                                 }
                             });
 
@@ -531,6 +588,10 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                 }
                             });
 
+                            check_bytes.push(quote! {
+                                #primitive_name::#variant_name => {}
+                            });
+
                             from_slice_unchecked.push(quote! {
                                 #primitive_name::#variant_name => {
                                     Ok(#name::#variant_name)
@@ -580,6 +641,19 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             match t {
                                 #(#from_slice)*
                             }
+                        }
+
+                        #[inline]
+                        fn check_bytes(slice: &mut &[u8]) -> Result<(), rapira::RapiraError>
+                        where
+                            Self: Sized,
+                        {
+                            let val: u8 = u8::from_slice(slice)?;
+                            let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                            match t {
+                                #(#check_bytes)*
+                            }
+                            Ok(())
                         }
 
                         #[inline]

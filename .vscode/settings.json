@@ -2,4 +2,5 @@
     "workbench.preferredLightColorTheme": "Verdigris Light",
     "rust-analyzer.hover.actions.enable": false,
     "rust-analyzer.lens.references.enumVariant.enable": true,
+    "rust-analyzer.checkOnSave.command": "clippy",
 }

@@ -21,7 +21,7 @@ default = ["zerocopy", "std", "json"]
 # default = ["zerocopy", "alloc"]
 # default = ["zerocopy"]
 # default = ["no_std"]
-std = ["thiserror", "alloc"]
+std = ["thiserror", "alloc", "simdutf8/std"]
 alloc = []
 json = ["serde_json/alloc"]
 no_std = []
@@ -41,3 +41,9 @@ indexmap = { version = "1.9", optional = true, default-features = false }
 [dependencies.time]
 version = "0.3"
 default-features = false
+
+[target.'cfg(not(target_env = "aarch64-apple-darwin"))'.dependencies]
+simdutf8 = { version = "0.1", default-features = false }
+
+[target.'cfg(target_env = "aarch64-apple-darwin")'.dependencies]
+simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
