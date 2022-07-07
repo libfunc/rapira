@@ -5,31 +5,29 @@ extern crate syn;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, Data, DeriveInput, Field, Fields, Ident, Lit, LitInt, Meta, NestedMeta,
+    parse_macro_input, Data, DeriveInput, Field, Fields, Ident, Lit, LitInt, Meta, MetaNameValue,
+    NestedMeta,
 };
-
-// TODO: impl for enum E { A { a_field1, ... }, B { b_field1... } } and enum E { A(B, C) }
 
 fn get_primitive_name(ast: &DeriveInput) -> Option<TokenStream> {
     ast.attrs.iter().find_map(|attr| {
         attr.path.segments.first().and_then(|segment| {
-            if segment.ident != "coming" {
+            if segment.ident != "primitive" {
                 return None;
             }
-            match attr.parse_args::<Meta>() {
-                Ok(Meta::NameValue(name_value)) => {
-                    if name_value.path.to_token_stream().to_string() != "primitive" {
+            match attr.parse_args::<MetaNameValue>() {
+                Ok(name_value) => {
+                    if name_value.path.to_token_stream().to_string() != "name" {
                         return None;
                     }
-                    if let Lit::Str(lit_str) = name_value.lit {
-                        let s = lit_str.parse::<Ident>().unwrap();
+                    if let Lit::Str(litstr) = name_value.lit {
+                        let s = litstr.parse::<Ident>().unwrap();
                         let value = s.to_token_stream();
                         Some(value)
                     } else {
                         None
                     }
                 }
-                Ok(_) => None,
                 Err(_) => None,
             }
         })
@@ -93,7 +91,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let try_convert_to_bytes: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
-                            let ident = field.ident.clone().unwrap();
+                            let ident = field.ident.as_ref().unwrap();
 
                             let gen = quote! {
                                self.#ident.try_convert_to_bytes(slice, cursor)?;
@@ -106,7 +104,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let convert_to_bytes: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
-                            let ident = field.ident.clone().unwrap();
+                            let ident = field.ident.as_ref().unwrap();
 
                             let gen = quote! {
                                self.#ident.convert_to_bytes(slice, cursor);
@@ -119,8 +117,8 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let from_slice: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
-                            let ident = field.ident.clone().unwrap();
-                            let typ = field.ty.clone();
+                            let ident = field.ident.as_ref().unwrap();
+                            let typ = &field.ty;
 
                             let gen = quote! {
                                 let #ident = <#typ as rapira::Rapira>::from_slice(slice)?;
@@ -133,7 +131,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let check_bytes: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
-                            let typ = field.ty.clone();
+                            let typ = &field.ty;
                             quote! {
                                 <#typ>::check_bytes(slice)?;
                             }
@@ -143,8 +141,8 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let from_slice_unchecked: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
-                            let ident = field.ident.clone().unwrap();
-                            let typ = field.ty.clone();
+                            let ident = field.ident.as_ref().unwrap();
+                            let typ = &field.ty;
 
                             let gen = quote! {
                                 let #ident = <#typ>::from_slice_unchecked(slice)?;
@@ -157,8 +155,8 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let from_slice_unsafe: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
-                            let ident = field.ident.clone().unwrap();
-                            let typ = field.ty.clone();
+                            let ident = field.ident.as_ref().unwrap();
+                            let typ = &field.ty;
 
                             let gen = quote! {
                                 let #ident = <#typ>::from_slice_unsafe(slice)?;
@@ -171,7 +169,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let field_names: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
-                            let ident = field.ident.clone().unwrap();
+                            let ident = field.ident.as_ref().unwrap();
                             quote! { #ident, }
                         })
                         .collect();
@@ -179,8 +177,8 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let size: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
-                            let ident = field.ident.clone().unwrap();
-                            let typ = field.ty.clone();
+                            let ident = field.ident.as_ref().unwrap();
+                            let typ = &field.ty;
 
                             quote! { + (match <#typ>::STATIC_SIZE {
                                 Some(s) => s,
@@ -192,7 +190,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     let static_sizes: Vec<TokenStream> = fields_insert
                         .iter()
                         .map(|(field, _)| {
-                            let typ = field.ty.clone();
+                            let typ = &field.ty;
                             quote! { <#typ>::STATIC_SIZE, }
                         })
                         .collect();
@@ -279,7 +277,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
 
                     for (idx, field) in unnamed.iter().enumerate() {
                         let id = syn::Lit::Int(LitInt::new(&idx.to_string(), Span::call_site()));
-                        let typ = field.ty.clone();
+                        let typ = &field.ty;
                         let field_name = syn::Ident::new(&format!("arg{}", idx), Span::call_site());
                         let field_name_into = quote! { #field_name, };
 
@@ -485,240 +483,479 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
 
                 proc_macro::TokenStream::from(gen)
             } else {
-                let primitive_name: TokenStream = get_primitive_name(&ast)
-                    .expect("complex enums must include primitive type name!");
+                let primitive_name = get_primitive_name(&ast);
 
-                let mut from_slice: Vec<TokenStream> = Vec::with_capacity(variants_len);
-                let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
-                let mut from_slice_unchecked: Vec<TokenStream> = Vec::with_capacity(variants_len);
-                let mut from_slice_unsafe: Vec<TokenStream> = Vec::with_capacity(variants_len);
-                let mut try_convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
-                let mut convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
-                let mut size: Vec<TokenStream> = Vec::with_capacity(variants_len);
-                let mut enum_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
+                match primitive_name {
+                    Some(primitive_name) => {
+                        let mut from_slice: Vec<TokenStream> = Vec::with_capacity(variants_len);
+                        let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
+                        let mut from_slice_unchecked: Vec<TokenStream> =
+                            Vec::with_capacity(variants_len);
+                        let mut from_slice_unsafe: Vec<TokenStream> =
+                            Vec::with_capacity(variants_len);
+                        let mut try_convert_to_bytes: Vec<TokenStream> =
+                            Vec::with_capacity(variants_len);
+                        let mut convert_to_bytes: Vec<TokenStream> =
+                            Vec::with_capacity(variants_len);
+                        let mut size: Vec<TokenStream> = Vec::with_capacity(variants_len);
+                        let mut enum_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
 
-                for variant in &data_enum.variants {
-                    let variant_name = &variant.ident;
-                    match &variant.fields {
-                        Fields::Unit => {
-                            from_slice.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    Ok(#name::#variant_name)
-                                }
-                            });
-
-                            check_bytes.push(quote! {
-                                #primitive_name::#variant_name => {}
-                            });
-
-                            from_slice_unchecked.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    Ok(#name::#variant_name)
-                                }
-                            });
-
-                            from_slice_unsafe.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    Ok(#name::#variant_name)
-                                }
-                            });
-
-                            let try_convert_to_bytes_q = quote! {
-                                #name::#variant_name => {}
-                            };
-                            try_convert_to_bytes.push(try_convert_to_bytes_q);
-
-                            let convert_to_bytes_q = quote! {
-                                #name::#variant_name => {}
-                            };
-                            convert_to_bytes.push(convert_to_bytes_q);
-
-                            let size_q = quote! {
-                                #name::#variant_name => 0,
-                            };
-                            size.push(size_q);
-
-                            let enum_sizes_q = quote! {
-                                None,
-                            };
-                            enum_sizes.push(enum_sizes_q);
-                        }
-                        Fields::Unnamed(fields) => {
-                            let len = fields.unnamed.len();
-                            if len == 1 {
-                                let field = fields.unnamed.first().unwrap();
-                                let typ = field.ty.clone();
-
-                                from_slice.push(quote! {
-                                    #primitive_name::#variant_name => {
-                                        let v = <#typ>::from_slice(slice)?;
-                                        Ok(#name::#variant_name(v))
-                                    }
-                                });
-
-                                check_bytes.push(quote! {
-                                    #primitive_name::#variant_name => {
-                                        <#typ>::check_bytes(slice)?;
-                                    }
-                                });
-
-                                from_slice_unchecked.push(quote! {
-                                    #primitive_name::#variant_name => {
-                                        let v = <#typ>::from_slice_unchecked(slice)?;
-                                        Ok(#name::#variant_name(v))
-                                    }
-                                });
-
-                                from_slice_unsafe.push(quote! {
-                                    #primitive_name::#variant_name => {
-                                        let v = <#typ>::from_slice_unsafe(slice)?;
-                                        Ok(#name::#variant_name(v))
-                                    }
-                                });
-
-                                let try_convert_to_bytes_q = quote! {
-                                    #name::#variant_name(v) => {
-                                        v.try_convert_to_bytes(slice, cursor)?;
-                                    }
-                                };
-                                try_convert_to_bytes.push(try_convert_to_bytes_q);
-
-                                let convert_to_bytes_q = quote! {
-                                    #name::#variant_name(v) => {
-                                        v.convert_to_bytes(slice, cursor);
-                                    }
-                                };
-                                convert_to_bytes.push(convert_to_bytes_q);
-
-                                let size_q = quote! {
-                                    #name::#variant_name(v) => {
-                                        match <#typ>::STATIC_SIZE {
-                                            Some(s) => s,
-                                            None => v.size(),
+                        for variant in &data_enum.variants {
+                            let variant_name = &variant.ident;
+                            match &variant.fields {
+                                Fields::Unit => {
+                                    from_slice.push(quote! {
+                                        #primitive_name::#variant_name => {
+                                            Ok(#name::#variant_name)
                                         }
-                                    },
-                                };
-                                size.push(size_q);
+                                    });
 
-                                let enum_sizes_q = quote! {
-                                    <#typ>::STATIC_SIZE,
-                                };
-                                enum_sizes.push(enum_sizes_q);
-                            } else {
-                                let unnamed = &fields.unnamed;
-                                let unnamed_len = unnamed.len();
+                                    check_bytes.push(quote! {
+                                        #primitive_name::#variant_name => {}
+                                    });
 
-                                let mut field_names: Vec<TokenStream> =
-                                    Vec::with_capacity(unnamed_len);
-                                let mut unnamed_from_slice: Vec<TokenStream> =
-                                    Vec::with_capacity(unnamed_len);
-                                let mut unnamed_check_bytes: Vec<TokenStream> =
-                                    Vec::with_capacity(unnamed_len);
-                                let mut unnamed_from_slice_unchecked: Vec<TokenStream> =
-                                    Vec::with_capacity(unnamed_len);
-                                let mut unnamed_from_slice_unsafe: Vec<TokenStream> =
-                                    Vec::with_capacity(unnamed_len);
-                                let mut unnamed_try_convert_to_bytes: Vec<TokenStream> =
-                                    Vec::with_capacity(unnamed_len);
-                                let mut unnamed_convert_to_bytes: Vec<TokenStream> =
-                                    Vec::with_capacity(unnamed_len);
-                                let mut unnamed_size: Vec<TokenStream> =
-                                    Vec::with_capacity(unnamed_len);
-                                let mut unnamed_static_sizes: Vec<TokenStream> =
-                                    Vec::with_capacity(unnamed_len);
+                                    from_slice_unchecked.push(quote! {
+                                        #primitive_name::#variant_name => {
+                                            Ok(#name::#variant_name)
+                                        }
+                                    });
 
-                                for (idx, field) in unnamed.iter().enumerate() {
-                                    let typ = field.ty.clone();
-                                    let field_name =
-                                        syn::Ident::new(&format!("arg{}", idx), Span::call_site());
+                                    from_slice_unsafe.push(quote! {
+                                        #primitive_name::#variant_name => {
+                                            Ok(#name::#variant_name)
+                                        }
+                                    });
 
-                                    unnamed_from_slice.push(quote! {
-                                        let #field_name = <#typ>::from_slice(slice)?;
+                                    try_convert_to_bytes.push(quote! {
+                                        #name::#variant_name => {}
                                     });
-                                    unnamed_check_bytes.push(quote! {
-                                        <#typ>::check_bytes(slice)?;
+
+                                    convert_to_bytes.push(quote! {
+                                        #name::#variant_name => {}
                                     });
-                                    unnamed_from_slice_unchecked.push(quote! {
-                                        let #field_name = <#typ>::from_slice_unchecked(slice)?;
+
+                                    size.push(quote! {
+                                        #name::#variant_name => 0,
                                     });
-                                    unnamed_from_slice_unsafe.push(quote! {
-                                        let #field_name = <#typ>::from_slice_unsafe(slice)?;
+
+                                    enum_sizes.push(quote! {
+                                        None,
                                     });
-                                    unnamed_try_convert_to_bytes.push(quote! {
-                                        #field_name.try_convert_to_bytes(slice, cursor)?;
+                                }
+                                Fields::Unnamed(fields) => {
+                                    let len = fields.unnamed.len();
+                                    if len == 1 {
+                                        let field = fields.unnamed.first().unwrap();
+                                        let typ = &field.ty;
+
+                                        from_slice.push(quote! {
+                                            #primitive_name::#variant_name => {
+                                                let v = <#typ>::from_slice(slice)?;
+                                                Ok(#name::#variant_name(v))
+                                            }
+                                        });
+
+                                        check_bytes.push(quote! {
+                                            #primitive_name::#variant_name => {
+                                                <#typ>::check_bytes(slice)?;
+                                            }
+                                        });
+
+                                        from_slice_unchecked.push(quote! {
+                                            #primitive_name::#variant_name => {
+                                                let v = <#typ>::from_slice_unchecked(slice)?;
+                                                Ok(#name::#variant_name(v))
+                                            }
+                                        });
+
+                                        from_slice_unsafe.push(quote! {
+                                            #primitive_name::#variant_name => {
+                                                let v = <#typ>::from_slice_unsafe(slice)?;
+                                                Ok(#name::#variant_name(v))
+                                            }
+                                        });
+
+                                        try_convert_to_bytes.push(quote! {
+                                            #name::#variant_name(v) => {
+                                                v.try_convert_to_bytes(slice, cursor)?;
+                                            }
+                                        });
+
+                                        convert_to_bytes.push(quote! {
+                                            #name::#variant_name(v) => {
+                                                v.convert_to_bytes(slice, cursor);
+                                            }
+                                        });
+
+                                        size.push(quote! {
+                                            #name::#variant_name(v) => {
+                                                match <#typ>::STATIC_SIZE {
+                                                    Some(s) => s,
+                                                    None => v.size(),
+                                                }
+                                            },
+                                        });
+
+                                        enum_sizes.push(quote! {
+                                            <#typ>::STATIC_SIZE,
+                                        });
+                                    } else {
+                                        let unnamed = &fields.unnamed;
+
+                                        let mut field_names: Vec<TokenStream> =
+                                            Vec::with_capacity(len);
+                                        let mut unnamed_from_slice: Vec<TokenStream> =
+                                            Vec::with_capacity(len);
+                                        let mut unnamed_check_bytes: Vec<TokenStream> =
+                                            Vec::with_capacity(len);
+                                        let mut unnamed_from_slice_unchecked: Vec<TokenStream> =
+                                            Vec::with_capacity(len);
+                                        let mut unnamed_from_slice_unsafe: Vec<TokenStream> =
+                                            Vec::with_capacity(len);
+                                        let mut unnamed_try_convert_to_bytes: Vec<TokenStream> =
+                                            Vec::with_capacity(len);
+                                        let mut unnamed_convert_to_bytes: Vec<TokenStream> =
+                                            Vec::with_capacity(len);
+                                        let mut unnamed_size: Vec<TokenStream> =
+                                            Vec::with_capacity(len);
+                                        let mut unnamed_static_sizes: Vec<TokenStream> =
+                                            Vec::with_capacity(len);
+
+                                        for (idx, field) in unnamed.iter().enumerate() {
+                                            let typ = &field.ty;
+                                            let field_name = syn::Ident::new(
+                                                &format!("arg{}", idx),
+                                                Span::call_site(),
+                                            );
+
+                                            unnamed_from_slice.push(quote! {
+                                                let #field_name = <#typ>::from_slice(slice)?;
+                                            });
+                                            unnamed_check_bytes.push(quote! {
+                                                <#typ>::check_bytes(slice)?;
+                                            });
+                                            unnamed_from_slice_unchecked.push(quote! {
+                                                let #field_name = <#typ>::from_slice_unchecked(slice)?;
+                                            });
+                                            unnamed_from_slice_unsafe.push(quote! {
+                                                let #field_name = <#typ>::from_slice_unsafe(slice)?;
+                                            });
+                                            unnamed_try_convert_to_bytes.push(quote! {
+                                                #field_name.try_convert_to_bytes(slice, cursor)?;
+                                            });
+                                            unnamed_convert_to_bytes.push(quote! {
+                                                #field_name.convert_to_bytes(slice, cursor);
+                                            });
+                                            unnamed_size.push(
+                                                quote! { + (match <#typ>::STATIC_SIZE {
+                                                    Some(s) => s,
+                                                    None => #field_name.size()
+                                                }) },
+                                            );
+                                            unnamed_static_sizes.push(quote! {
+                                                <#typ>::STATIC_SIZE,
+                                            });
+                                            field_names.push(quote! { #field_name, });
+                                        }
+
+                                        from_slice.push(quote! {
+                                            #primitive_name::#variant_name => {
+                                                #(#unnamed_from_slice)*
+                                                Ok(#name::#variant_name(#(#field_names)*))
+                                            }
+                                        });
+
+                                        check_bytes.push(quote! {
+                                            #primitive_name::#variant_name => {
+                                                #(#unnamed_check_bytes)*
+                                            }
+                                        });
+
+                                        from_slice_unchecked.push(quote! {
+                                            #primitive_name::#variant_name => {
+                                                #(#unnamed_from_slice_unchecked)*
+                                                Ok(#name::#variant_name(#(#field_names)*))
+                                            }
+                                        });
+
+                                        from_slice_unsafe.push(quote! {
+                                            #primitive_name::#variant_name => {
+                                                #(#unnamed_from_slice_unsafe)*
+                                                Ok(#name::#variant_name(#(#field_names)*))
+                                            }
+                                        });
+
+                                        try_convert_to_bytes.push(quote! {
+                                            #name::#variant_name(#(#field_names)*) => {
+                                                #(#unnamed_try_convert_to_bytes)*
+                                            }
+                                        });
+
+                                        convert_to_bytes.push(quote! {
+                                            #name::#variant_name(#(#field_names)*) => {
+                                                #(#unnamed_convert_to_bytes)*
+                                            }
+                                        });
+
+                                        size.push(quote! {
+                                            #name::#variant_name(#(#field_names)*) => {
+                                                0 #(#unnamed_size)*
+                                            },
+                                        });
+
+                                        enum_sizes.push(quote! {
+                                            rapira::static_size([#(#unnamed_static_sizes)*]),
+                                        });
+                                    }
+                                }
+                                Fields::Named(fields) => {
+                                    let named = &fields.named;
+                                    let len = named.len();
+
+                                    let mut fields_insert: Vec<(Field, u32)> =
+                                        Vec::with_capacity(len);
+                                    let mut seq = 0u32;
+
+                                    for field in named.iter() {
+                                        let field_idx = field
+                                            .attrs
+                                            .iter()
+                                            .find_map(|a| {
+                                                a.path.segments.first().and_then(|segment| {
+                                                    if segment.ident != "idx" {
+                                                        return None;
+                                                    }
+                                                    match a.parse_args::<Meta>() {
+                                                        Ok(Meta::List(list)) => {
+                                                            let a = list.nested.first().unwrap();
+                                                            let int: u32 = match a {
+                                                                NestedMeta::Lit(Lit::Int(i)) => {
+                                                                    i.base10_parse::<u32>().unwrap()
+                                                                }
+                                                                _ => {
+                                                                    panic!("error meta type")
+                                                                }
+                                                            };
+                                                            Some(int)
+                                                        }
+                                                        Ok(_) => None,
+                                                        Err(_) => None,
+                                                    }
+                                                })
+                                            })
+                                            .unwrap_or_else(|| {
+                                                let current_seq = seq;
+                                                seq += 1;
+                                                current_seq
+                                            });
+
+                                        fields_insert.push((field.clone(), field_idx));
+                                    }
+
+                                    fields_insert
+                                        .sort_by(|(_, idx_a), (_, idx_b)| idx_a.cmp(idx_b));
+
+                                    let mut field_names: Vec<TokenStream> = Vec::with_capacity(len);
+                                    let mut named_from_slice: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut named_check_bytes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut named_from_slice_unchecked: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut named_from_slice_unsafe: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut named_try_convert_to_bytes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut named_convert_to_bytes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut named_size: Vec<TokenStream> = Vec::with_capacity(len);
+                                    let mut named_static_sizes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+
+                                    for field in fields_insert.iter().map(|(f, _)| f) {
+                                        let typ = &field.ty;
+                                        let field_name = field.ident.as_ref().unwrap();
+
+                                        named_from_slice.push(quote! {
+                                            let #field_name = <#typ>::from_slice(slice)?;
+                                        });
+                                        named_check_bytes.push(quote! {
+                                            <#typ>::check_bytes(slice)?;
+                                        });
+                                        named_from_slice_unchecked.push(quote! {
+                                            let #field_name = <#typ>::from_slice_unchecked(slice)?;
+                                        });
+                                        named_from_slice_unsafe.push(quote! {
+                                            let #field_name = <#typ>::from_slice_unsafe(slice)?;
+                                        });
+                                        named_try_convert_to_bytes.push(quote! {
+                                            #field_name.try_convert_to_bytes(slice, cursor)?;
+                                        });
+                                        named_convert_to_bytes.push(quote! {
+                                            #field_name.convert_to_bytes(slice, cursor);
+                                        });
+                                        named_size.push(quote! { + (match <#typ>::STATIC_SIZE {
+                                            Some(s) => s,
+                                            None => #field_name.size()
+                                        }) });
+                                        named_static_sizes.push(quote! {
+                                            <#typ>::STATIC_SIZE,
+                                        });
+                                        field_names.push(quote! { #field_name, });
+                                    }
+
+                                    from_slice.push(quote! {
+                                        #primitive_name::#variant_name => {
+                                            #(#named_from_slice)*
+                                            Ok(#name::#variant_name{#(#field_names)*})
+                                        }
                                     });
-                                    unnamed_convert_to_bytes.push(quote! {
-                                        #field_name.convert_to_bytes(slice, cursor);
+
+                                    check_bytes.push(quote! {
+                                        #primitive_name::#variant_name => {
+                                            #(#named_check_bytes)*
+                                        }
                                     });
-                                    unnamed_size.push(quote! { + (match <#typ>::STATIC_SIZE {
-                                        Some(s) => s,
-                                        None => #field_name.size()
-                                    }) });
-                                    unnamed_static_sizes.push(quote! {
-                                        <#typ>::STATIC_SIZE,
+
+                                    from_slice_unchecked.push(quote! {
+                                        #primitive_name::#variant_name => {
+                                            #(#named_from_slice_unchecked)*
+                                            Ok(#name::#variant_name{#(#field_names)*})
+                                        }
                                     });
-                                    field_names.push(quote! { #field_name, });
+
+                                    from_slice_unsafe.push(quote! {
+                                        #primitive_name::#variant_name => {
+                                            #(#named_from_slice_unsafe)*
+                                            Ok(#name::#variant_name{#(#field_names)*})
+                                        }
+                                    });
+
+                                    try_convert_to_bytes.push(quote! {
+                                        #name::#variant_name{#(#field_names)*} => {
+                                            #(#named_try_convert_to_bytes)*
+                                        }
+                                    });
+
+                                    convert_to_bytes.push(quote! {
+                                        #name::#variant_name{#(#field_names)*} => {
+                                            #(#named_convert_to_bytes)*
+                                        }
+                                    });
+
+                                    size.push(quote! {
+                                        #name::#variant_name{#(#field_names)*} => {
+                                            0 #(#named_size)*
+                                        },
+                                    });
+
+                                    enum_sizes.push(quote! {
+                                        rapira::static_size([#(#named_static_sizes)*]),
+                                    });
+                                }
+                            };
+                        }
+
+                        let gen = quote! {
+                            impl rapira::Rapira for #name {
+                                const STATIC_SIZE: Option<usize> = rapira::enum_size([#(#enum_sizes)*]);
+
+                                #[inline]
+                                fn from_slice(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
+                                where
+                                    Self: Sized,
+                                {
+                                    let val: u8 = u8::from_slice(slice)?;
+                                    let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                                    match t {
+                                        #(#from_slice)*
+                                    }
                                 }
 
-                                from_slice.push(quote! {
-                                    #primitive_name::#variant_name => {
-                                        #(#unnamed_from_slice)*
-                                        Ok(#name::#variant_name(#(#field_names)*))
+                                #[inline]
+                                fn check_bytes(slice: &mut &[u8]) -> Result<(), rapira::RapiraError>
+                                where
+                                    Self: Sized,
+                                {
+                                    let val: u8 = u8::from_slice(slice)?;
+                                    let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                                    match t {
+                                        #(#check_bytes)*
                                     }
-                                });
+                                    Ok(())
+                                }
 
-                                check_bytes.push(quote! {
-                                    #primitive_name::#variant_name => {
-                                        #(#unnamed_check_bytes)*
+                                #[inline]
+                                fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
+                                where
+                                    Self: Sized,
+                                {
+                                    let val: u8 = u8::from_slice(slice)?;
+                                    let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                                    match t {
+                                        #(#from_slice_unchecked)*
                                     }
-                                });
+                                }
 
-                                from_slice_unchecked.push(quote! {
-                                    #primitive_name::#variant_name => {
-                                        #(#unnamed_from_slice_unchecked)*
-                                        Ok(#name::#variant_name(#(#field_names)*))
+                                #[inline]
+                                unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
+                                where
+                                    Self: Sized,
+                                {
+                                    let val: u8 = u8::from_slice_unsafe(slice)?;
+                                    let t = <#primitive_name as primitive_enum::UnsafeFromU8>::from_unsafe(val);
+                                    match t {
+                                        #(#from_slice_unsafe)*
                                     }
-                                });
+                                }
 
-                                from_slice_unsafe.push(quote! {
-                                    #primitive_name::#variant_name => {
-                                        #(#unnamed_from_slice_unsafe)*
-                                        Ok(#name::#variant_name(#(#field_names)*))
+                                #[inline]
+                                fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<(), rapira::RapiraError> {
+                                    let t = self.get_primitive_enum() as u8;
+                                    rapira::push(slice, cursor, t);
+                                    match self {
+                                        #(#try_convert_to_bytes)*
                                     }
-                                });
+                                    Ok(())
+                                }
 
-                                try_convert_to_bytes.push(quote! {
-                                    #name::#variant_name(#(#field_names)*) => {
-                                        #(#unnamed_try_convert_to_bytes)*
+                                #[inline]
+                                fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+                                    let t = self.get_primitive_enum() as u8;
+                                    rapira::push(slice, cursor, t);
+                                    match self {
+                                        #(#convert_to_bytes)*
                                     }
-                                });
+                                }
 
-                                convert_to_bytes.push(quote! {
-                                    #name::#variant_name(#(#field_names)*) => {
-                                        #(#unnamed_convert_to_bytes)*
+                                #[inline]
+                                fn size(&self) -> usize {
+                                    1 + match self {
+                                        #(#size)*
                                     }
-                                });
-
-                                size.push(quote! {
-                                    #name::#variant_name(#(#field_names)*) => {
-                                        0 #(#unnamed_size)*
-                                    },
-                                });
-
-                                enum_sizes.push(quote! {
-                                    rapira::static_size([#(#unnamed_static_sizes)*]),
-                                });
+                                }
                             }
-                        }
-                        Fields::Named(fields) => {
-                            let named = &fields.named;
-                            let len = named.len();
+                        };
 
-                            let mut fields_insert: Vec<(Field, u32)> = Vec::with_capacity(len);
-                            let mut seq = 0u32;
+                        proc_macro::TokenStream::from(gen)
+                    }
+                    None => {
+                        let mut enum_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
+                        let mut size: Vec<TokenStream> = Vec::with_capacity(variants_len);
+                        let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
+                        let mut from_slice: Vec<TokenStream> = Vec::with_capacity(variants_len);
+                        let mut from_slice_unchecked: Vec<TokenStream> =
+                            Vec::with_capacity(variants_len);
+                        let mut from_slice_unsafe: Vec<TokenStream> =
+                            Vec::with_capacity(variants_len);
+                        let mut try_convert_to_bytes: Vec<TokenStream> =
+                            Vec::with_capacity(variants_len);
+                        let mut convert_to_bytes: Vec<TokenStream> =
+                            Vec::with_capacity(variants_len);
 
-                            for field in named.iter() {
-                                let field_idx = field
+                        for (variant_id, variant) in
+                            data_enum.variants.iter().enumerate().map(|(idx, variant)| {
+                                let id: u8 = variant
                                     .attrs
                                     .iter()
                                     .find_map(|a| {
@@ -729,9 +966,9 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                             match a.parse_args::<Meta>() {
                                                 Ok(Meta::List(list)) => {
                                                     let a = list.nested.first().unwrap();
-                                                    let int: u32 = match a {
+                                                    let int: u8 = match a {
                                                         NestedMeta::Lit(Lit::Int(i)) => {
-                                                            i.base10_parse::<u32>().unwrap()
+                                                            i.base10_parse::<u8>().unwrap()
                                                         }
                                                         _ => {
                                                             panic!("error meta type")
@@ -744,197 +981,374 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                             }
                                         })
                                     })
-                                    .unwrap_or_else(|| {
-                                        let current_seq = seq;
-                                        seq += 1;
-                                        current_seq
+                                    .unwrap_or(idx as u8);
+                                (id, variant)
+                            })
+                        {
+                            let variant_name = &variant.ident;
+
+                            match &variant.fields {
+                                Fields::Unit => {
+                                    from_slice.push(quote! {
+                                        #variant_id => {
+                                            Ok(#name::#variant_name)
+                                        }
+                                    });
+                                    check_bytes.push(quote! {
+                                        #variant_id => {}
+                                    });
+                                    from_slice_unchecked.push(quote! {
+                                        #variant_id => {
+                                            Ok(#name::#variant_name)
+                                        }
+                                    });
+                                    from_slice_unsafe.push(quote! {
+                                        #variant_id => {
+                                            Ok(#name::#variant_name)
+                                        }
+                                    });
+                                    try_convert_to_bytes.push(quote! {
+                                        #name::#variant_name => {}
+                                    });
+                                    convert_to_bytes.push(quote! {
+                                        #name::#variant_name => {}
+                                    });
+                                    size.push(quote! {
+                                        #name::#variant_name => 0,
+                                    });
+                                    enum_sizes.push(quote! {
+                                        None,
+                                    });
+                                }
+                                Fields::Unnamed(fields) => {
+                                    let len = fields.unnamed.len();
+                                    let fields = &fields.unnamed;
+
+                                    let mut field_names: Vec<TokenStream> = Vec::with_capacity(len);
+                                    let mut fields_static_sizes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_size: Vec<TokenStream> = Vec::with_capacity(len);
+                                    let mut fields_from_slice: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_check_bytes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_from_slice_unchecked: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_from_slice_unsafe: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_try_convert_to_bytes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_convert_to_bytes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+
+                                    for (idx, field) in fields.iter().enumerate() {
+                                        let typ = &field.ty;
+                                        let field_name = syn::Ident::new(
+                                            &format!("arg{}", idx),
+                                            Span::call_site(),
+                                        );
+
+                                        field_names.push(quote! { #field_name, });
+                                        fields_static_sizes.push(quote! {
+                                            <#typ>::STATIC_SIZE,
+                                        });
+                                        fields_size.push(quote! { + (match <#typ>::STATIC_SIZE {
+                                            Some(s) => s,
+                                            None => #field_name.size()
+                                        }) });
+                                        fields_from_slice.push(quote! {
+                                            let #field_name = <#typ>::from_slice(slice)?;
+                                        });
+                                        fields_check_bytes.push(quote! {
+                                            <#typ>::check_bytes(slice)?;
+                                        });
+                                        fields_from_slice_unchecked.push(quote! {
+                                            let #field_name = <#typ>::from_slice_unchecked(slice)?;
+                                        });
+                                        fields_from_slice_unsafe.push(quote! {
+                                            let #field_name = <#typ>::from_slice_unsafe(slice)?;
+                                        });
+                                        fields_try_convert_to_bytes.push(quote! {
+                                            #field_name.try_convert_to_bytes(slice, cursor)?;
+                                        });
+                                        fields_convert_to_bytes.push(quote! {
+                                            #field_name.convert_to_bytes(slice, cursor);
+                                        });
+                                    }
+
+                                    size.push(quote! {
+                                        #name::#variant_name(#(#field_names)*) => {
+                                            0 #(#fields_size)*
+                                        },
+                                    });
+                                    enum_sizes.push(quote! {
+                                        rapira::static_size([#(#fields_static_sizes)*]),
+                                    });
+                                    from_slice.push(quote! {
+                                        #variant_id => {
+                                            #(#fields_from_slice)*
+                                            Ok(#name::#variant_name(#(#field_names)*))
+                                        }
+                                    });
+                                    check_bytes.push(quote! {
+                                        #variant_id => {
+                                            #(#fields_check_bytes)*
+                                        }
+                                    });
+                                    from_slice_unchecked.push(quote! {
+                                        #variant_id => {
+                                            #(#fields_from_slice_unchecked)*
+                                            Ok(#name::#variant_name(#(#field_names)*))
+                                        }
                                     });
 
-                                fields_insert.push((field.clone(), field_idx));
-                            }
+                                    from_slice_unsafe.push(quote! {
+                                        #variant_id => {
+                                            #(#fields_from_slice_unsafe)*
+                                            Ok(#name::#variant_name(#(#field_names)*))
+                                        }
+                                    });
 
-                            fields_insert.sort_by(|(_, idx_a), (_, idx_b)| idx_a.cmp(idx_b));
+                                    try_convert_to_bytes.push(quote! {
+                                        #name::#variant_name(#(#field_names)*) => {
+                                            rapira::push(slice, cursor, #variant_id);
+                                            #(#fields_try_convert_to_bytes)*
+                                        }
+                                    });
 
-                            let mut field_names: Vec<TokenStream> = Vec::with_capacity(len);
-                            let mut named_from_slice: Vec<TokenStream> = Vec::with_capacity(len);
-                            let mut named_check_bytes: Vec<TokenStream> = Vec::with_capacity(len);
-                            let mut named_from_slice_unchecked: Vec<TokenStream> =
-                                Vec::with_capacity(len);
-                            let mut named_from_slice_unsafe: Vec<TokenStream> =
-                                Vec::with_capacity(len);
-                            let mut named_try_convert_to_bytes: Vec<TokenStream> =
-                                Vec::with_capacity(len);
-                            let mut named_convert_to_bytes: Vec<TokenStream> =
-                                Vec::with_capacity(len);
-                            let mut named_size: Vec<TokenStream> = Vec::with_capacity(len);
-                            let mut named_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
-
-                            for field in named.iter() {
-                                let typ = field.ty.clone();
-                                let field_name = field.ident.clone().unwrap();
-
-                                named_from_slice.push(quote! {
-                                    let #field_name = <#typ>::from_slice(slice)?;
-                                });
-                                named_check_bytes.push(quote! {
-                                    <#typ>::check_bytes(slice)?;
-                                });
-                                named_from_slice_unchecked.push(quote! {
-                                    let #field_name = <#typ>::from_slice_unchecked(slice)?;
-                                });
-                                named_from_slice_unsafe.push(quote! {
-                                    let #field_name = <#typ>::from_slice_unsafe(slice)?;
-                                });
-                                named_try_convert_to_bytes.push(quote! {
-                                    #field_name.try_convert_to_bytes(slice, cursor)?;
-                                });
-                                named_convert_to_bytes.push(quote! {
-                                    #field_name.convert_to_bytes(slice, cursor);
-                                });
-                                named_size.push(quote! { + (match <#typ>::STATIC_SIZE {
-                                    Some(s) => s,
-                                    None => #field_name.size()
-                                }) });
-                                named_static_sizes.push(quote! {
-                                    <#typ>::STATIC_SIZE,
-                                });
-                                field_names.push(quote! { #field_name, });
-                            }
-
-                            from_slice.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    #(#named_from_slice)*
-                                    Ok(#name::#variant_name{#(#field_names)*})
+                                    convert_to_bytes.push(quote! {
+                                        #name::#variant_name(#(#field_names)*) => {
+                                            rapira::push(slice, cursor, #variant_id);
+                                            #(#fields_convert_to_bytes)*
+                                        }
+                                    });
                                 }
-                            });
+                                Fields::Named(fields) => {
+                                    let len = fields.named.len();
+                                    let fields = &fields.named;
 
-                            check_bytes.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    #(#named_check_bytes)*
+                                    let mut fields_insert: Vec<(Field, u32)> =
+                                        Vec::with_capacity(len);
+                                    let mut seq = 0u32;
+
+                                    for field in fields.iter() {
+                                        let field_idx = field
+                                            .attrs
+                                            .iter()
+                                            .find_map(|a| {
+                                                a.path.segments.first().and_then(|segment| {
+                                                    if segment.ident != "idx" {
+                                                        return None;
+                                                    }
+                                                    match a.parse_args::<Meta>() {
+                                                        Ok(Meta::List(list)) => {
+                                                            let a = list.nested.first().unwrap();
+                                                            let int: u32 = match a {
+                                                                NestedMeta::Lit(Lit::Int(i)) => {
+                                                                    i.base10_parse::<u32>().unwrap()
+                                                                }
+                                                                _ => {
+                                                                    panic!("error meta type")
+                                                                }
+                                                            };
+                                                            Some(int)
+                                                        }
+                                                        Ok(_) => None,
+                                                        Err(_) => None,
+                                                    }
+                                                })
+                                            })
+                                            .unwrap_or_else(|| {
+                                                let current_seq = seq;
+                                                seq += 1;
+                                                current_seq
+                                            });
+
+                                        fields_insert.push((field.clone(), field_idx));
+                                    }
+
+                                    fields_insert
+                                        .sort_by(|(_, idx_a), (_, idx_b)| idx_a.cmp(idx_b));
+
+                                    let mut field_names: Vec<TokenStream> = Vec::with_capacity(len);
+                                    let mut fields_from_slice: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_check_bytes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_from_slice_unchecked: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_from_slice_unsafe: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_try_convert_to_bytes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_convert_to_bytes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+                                    let mut fields_size: Vec<TokenStream> = Vec::with_capacity(len);
+                                    let mut fields_static_sizes: Vec<TokenStream> =
+                                        Vec::with_capacity(len);
+
+                                    for field in fields_insert.iter().map(|(f, _)| f) {
+                                        let typ = &field.ty;
+                                        let field_name = field.ident.as_ref().unwrap();
+
+                                        fields_from_slice.push(quote! {
+                                            let #field_name = <#typ>::from_slice(slice)?;
+                                        });
+                                        fields_check_bytes.push(quote! {
+                                            <#typ>::check_bytes(slice)?;
+                                        });
+                                        fields_from_slice_unchecked.push(quote! {
+                                            let #field_name = <#typ>::from_slice_unchecked(slice)?;
+                                        });
+                                        fields_from_slice_unsafe.push(quote! {
+                                            let #field_name = <#typ>::from_slice_unsafe(slice)?;
+                                        });
+                                        fields_try_convert_to_bytes.push(quote! {
+                                            #field_name.try_convert_to_bytes(slice, cursor)?;
+                                        });
+                                        fields_convert_to_bytes.push(quote! {
+                                            #field_name.convert_to_bytes(slice, cursor);
+                                        });
+                                        fields_size.push(quote! { + (match <#typ>::STATIC_SIZE {
+                                            Some(s) => s,
+                                            None => #field_name.size()
+                                        }) });
+                                        fields_static_sizes.push(quote! {
+                                            <#typ>::STATIC_SIZE,
+                                        });
+                                        field_names.push(quote! { #field_name, });
+                                    }
+
+                                    size.push(quote! {
+                                        #name::#variant_name{#(#field_names)*} => {
+                                            0 #(#fields_size)*
+                                        },
+                                    });
+                                    enum_sizes.push(quote! {
+                                        rapira::static_size([#(#fields_static_sizes)*]),
+                                    });
+                                    from_slice.push(quote! {
+                                        #variant_id => {
+                                            #(#fields_from_slice)*
+                                            Ok(#name::#variant_name{#(#field_names)*})
+                                        }
+                                    });
+                                    check_bytes.push(quote! {
+                                        #variant_id => {
+                                            #(#fields_check_bytes)*
+                                        }
+                                    });
+                                    from_slice_unchecked.push(quote! {
+                                        #variant_id => {
+                                            #(#fields_from_slice_unchecked)*
+                                            Ok(#name::#variant_name{#(#field_names)*})
+                                        }
+                                    });
+
+                                    from_slice_unsafe.push(quote! {
+                                        #variant_id => {
+                                            #(#fields_from_slice_unsafe)*
+                                            Ok(#name::#variant_name{#(#field_names)*})
+                                        }
+                                    });
+
+                                    try_convert_to_bytes.push(quote! {
+                                        #name::#variant_name{#(#field_names)*} => {
+                                            rapira::push(slice, cursor, #variant_id);
+                                            #(#fields_try_convert_to_bytes)*
+                                        }
+                                    });
+
+                                    convert_to_bytes.push(quote! {
+                                        #name::#variant_name{#(#field_names)*} => {
+                                            rapira::push(slice, cursor, #variant_id);
+                                            #(#fields_convert_to_bytes)*
+                                        }
+                                    });
                                 }
-                            });
+                            }
+                        }
 
-                            from_slice_unchecked.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    #(#named_from_slice_unchecked)*
-                                    Ok(#name::#variant_name{#(#field_names)*})
+                        let gen = quote! {
+                            impl rapira::Rapira for #name {
+                                const STATIC_SIZE: Option<usize> = rapira::enum_size([#(#enum_sizes)*]);
+
+                                #[inline]
+                                fn from_slice(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
+                                where
+                                    Self: Sized,
+                                {
+                                    let val: u8 = u8::from_slice(slice)?;
+                                    match val {
+                                        #(#from_slice)*
+                                        _ => rapira::RapiraError::EnumVariantError,
+                                    }
                                 }
-                            });
 
-                            from_slice_unsafe.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    #(#named_from_slice_unsafe)*
-                                    Ok(#name::#variant_name{#(#field_names)*})
+                                #[inline]
+                                fn check_bytes(slice: &mut &[u8]) -> Result<(), rapira::RapiraError>
+                                where
+                                    Self: Sized,
+                                {
+                                    let val: u8 = u8::from_slice(slice)?;
+                                    match val {
+                                        #(#check_bytes)*
+                                        _ => rapira::RapiraError::EnumVariantError,
+                                    }
+                                    Ok(())
                                 }
-                            });
 
-                            try_convert_to_bytes.push(quote! {
-                                #name::#variant_name{#(#field_names)*} => {
-                                    #(#named_try_convert_to_bytes)*
+                                #[inline]
+                                fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
+                                where
+                                    Self: Sized,
+                                {
+                                    let val: u8 = u8::from_slice(slice)?;
+                                    match val {
+                                        #(#from_slice_unchecked)*
+                                        _ => rapira::RapiraError::EnumVariantError,
+                                    }
                                 }
-                            });
 
-                            convert_to_bytes.push(quote! {
-                                #name::#variant_name{#(#field_names)*} => {
-                                    #(#named_convert_to_bytes)*
+                                #[inline]
+                                unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
+                                where
+                                    Self: Sized,
+                                {
+                                    let val: u8 = u8::from_slice_unsafe(slice)?;
+                                    match val {
+                                        #(#from_slice_unsafe)*
+                                        _ => rapira::RapiraError::EnumVariantError,
+                                    }
                                 }
-                            });
 
-                            size.push(quote! {
-                                #name::#variant_name{#(#field_names)*} => {
-                                    0 #(#named_size)*
-                                },
-                            });
+                                #[inline]
+                                fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<(), rapira::RapiraError> {
+                                    match self {
+                                        #(#try_convert_to_bytes)*
+                                    }
+                                    Ok(())
+                                }
 
-                            enum_sizes.push(quote! {
-                                rapira::static_size([#(#named_static_sizes)*]),
-                            });
-                        }
-                    };
-                }
+                                #[inline]
+                                fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+                                    match self {
+                                        #(#convert_to_bytes)*
+                                    }
+                                }
 
-                let gen = quote! {
-                    impl rapira::Rapira for #name {
-                        const STATIC_SIZE: Option<usize> = rapira::enum_size([#(#enum_sizes)*]);
-
-                        #[inline]
-                        fn from_slice(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
-                        where
-                            Self: Sized,
-                        {
-                            let val: u8 = u8::from_slice(slice)?;
-                            let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
-                            match t {
-                                #(#from_slice)*
+                                #[inline]
+                                fn size(&self) -> usize {
+                                    1 + match self {
+                                        #(#size)*
+                                    }
+                                }
                             }
-                        }
+                        };
 
-                        #[inline]
-                        fn check_bytes(slice: &mut &[u8]) -> Result<(), rapira::RapiraError>
-                        where
-                            Self: Sized,
-                        {
-                            let val: u8 = u8::from_slice(slice)?;
-                            let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
-                            match t {
-                                #(#check_bytes)*
-                            }
-                            Ok(())
-                        }
-
-                        #[inline]
-                        fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
-                        where
-                            Self: Sized,
-                        {
-                            let val: u8 = u8::from_slice(slice)?;
-                            let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
-                            match t {
-                                #(#from_slice_unchecked)*
-                            }
-                        }
-
-                        #[inline]
-                        unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, rapira::RapiraError>
-                        where
-                            Self: Sized,
-                        {
-                            let val: u8 = u8::from_slice_unsafe(slice)?;
-                            let t = <#primitive_name as primitive_enum::UnsafeFromU8>::from_unsafe(val);
-                            match t {
-                                #(#from_slice_unsafe)*
-                            }
-                        }
-
-                        #[inline]
-                        fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<(), rapira::RapiraError> {
-                            let t = self.get_primitive_enum() as u8;
-                            rapira::push(slice, cursor, t);
-                            match self {
-                                #(#try_convert_to_bytes)*
-                            }
-                            Ok(())
-                        }
-
-                        #[inline]
-                        fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-                            let t = self.get_primitive_enum() as u8;
-                            rapira::push(slice, cursor, t);
-                            match self {
-                                #(#convert_to_bytes)*
-                            }
-                        }
-
-                        #[inline]
-                        fn size(&self) -> usize {
-                            1 + match self {
-                                #(#size)*
-                            }
-                        }
+                        proc_macro::TokenStream::from(gen)
                     }
-                };
-
-                proc_macro::TokenStream::from(gen)
+                }
             }
         }
         Data::Union(_) => {
