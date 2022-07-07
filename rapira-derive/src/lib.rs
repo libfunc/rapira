@@ -126,7 +126,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             let typ = field.ty.clone();
 
                             let gen = quote! {
-                                let #ident = <#typ>::from_slice(slice)?;
+                                let #ident = <#typ as rapira::Rapira>::from_slice(slice)?;
                             };
 
                             gen
