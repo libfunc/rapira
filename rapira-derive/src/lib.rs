@@ -5,8 +5,7 @@ extern crate syn;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, Data, DeriveInput, Field, Fields, Ident, Lit, LitInt, Meta, MetaNameValue,
-    NestedMeta,
+    parse_macro_input, Data, DeriveInput, Field, Fields, Ident, Lit, LitInt, Meta, NestedMeta,
 };
 
 fn get_primitive_name(ast: &DeriveInput) -> Option<TokenStream> {
@@ -15,11 +14,8 @@ fn get_primitive_name(ast: &DeriveInput) -> Option<TokenStream> {
             if segment.ident != "primitive" {
                 return None;
             }
-            match attr.parse_args::<MetaNameValue>() {
-                Ok(name_value) => {
-                    if name_value.path.to_token_stream().to_string() != "name" {
-                        return None;
-                    }
+            match attr.parse_meta() {
+                Ok(Meta::NameValue(name_value)) => {
                     if let Lit::Str(litstr) = name_value.lit {
                         let s = litstr.parse::<Ident>().unwrap();
                         let value = s.to_token_stream();
@@ -28,6 +24,7 @@ fn get_primitive_name(ast: &DeriveInput) -> Option<TokenStream> {
                         None
                     }
                 }
+                Ok(_) => None,
                 Err(_) => None,
             }
         })
