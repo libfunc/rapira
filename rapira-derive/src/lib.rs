@@ -1008,10 +1008,14 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                         }
                                     });
                                     try_convert_to_bytes.push(quote! {
-                                        #name::#variant_name => {}
+                                        #name::#variant_name => {
+                                            rapira::push(slice, cursor, #variant_id);
+                                        }
                                     });
                                     convert_to_bytes.push(quote! {
-                                        #name::#variant_name => {}
+                                        #name::#variant_name => {
+                                            rapira::push(slice, cursor, #variant_id);
+                                        }
                                     });
                                     size.push(quote! {
                                         #name::#variant_name => 0,
@@ -1281,7 +1285,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                     let val: u8 = u8::from_slice(slice)?;
                                     match val {
                                         #(#from_slice)*
-                                        _ => rapira::RapiraError::EnumVariantError,
+                                        _ => Err(rapira::RapiraError::EnumVariantError),
                                     }
                                 }
 
@@ -1293,7 +1297,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                     let val: u8 = u8::from_slice(slice)?;
                                     match val {
                                         #(#check_bytes)*
-                                        _ => rapira::RapiraError::EnumVariantError,
+                                        _ => return Err(rapira::RapiraError::EnumVariantError),
                                     }
                                     Ok(())
                                 }
@@ -1306,7 +1310,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                     let val: u8 = u8::from_slice(slice)?;
                                     match val {
                                         #(#from_slice_unchecked)*
-                                        _ => rapira::RapiraError::EnumVariantError,
+                                        _ => Err(rapira::RapiraError::EnumVariantError),
                                     }
                                 }
 
@@ -1318,7 +1322,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                     let val: u8 = u8::from_slice_unsafe(slice)?;
                                     match val {
                                         #(#from_slice_unsafe)*
-                                        _ => rapira::RapiraError::EnumVariantError,
+                                        _ => Err(rapira::RapiraError::EnumVariantError),
                                     }
                                 }
 
