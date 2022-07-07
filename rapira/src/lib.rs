@@ -8,6 +8,11 @@ extern crate alloc;
 
 #[cfg(feature = "alloc")]
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
+#[cfg(feature = "arrayvec")]
+use arrayvec::ArrayVec;
+
+#[cfg(feature = "smallvec")]
+use smallvec::SmallVec;
 
 use core::{mem::size_of, num::NonZeroU32};
 pub use rapira_derive::Rapira;
@@ -870,6 +875,204 @@ impl<T: Rapira> Rapira for Vec<T> {
     {
         let len = get_u32_unsafe(slice) as usize;
         let mut vec: Vec<T> = Vec::with_capacity(len);
+
+        for _ in 0..len {
+            let val = T::from_slice_unsafe(slice)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(
+        &self,
+        slice: &mut [u8],
+        cursor: &mut usize,
+    ) -> Result<(), RapiraError> {
+        let len = self.len() as u32;
+        len.try_convert_to_bytes(slice, cursor)?;
+
+        for val in self.iter() {
+            val.try_convert_to_bytes(slice, cursor)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let len = self.len() as u32;
+        len.convert_to_bytes(slice, cursor);
+
+        for val in self.iter() {
+            val.convert_to_bytes(slice, cursor);
+        }
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        match T::STATIC_SIZE {
+            Some(size) => 4 + (size * self.len()),
+            None => 4 + self.iter().fold(0, |b, v| b + v.size()),
+        }
+    }
+}
+
+#[cfg(feature = "arrayvec")]
+impl<T: Rapira, const CAP: usize> Rapira for ArrayVec<T, CAP> {
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
+
+        for _ in 0..len {
+            let val = T::from_slice(slice)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+
+        for _ in 0..len {
+            T::check_bytes(slice)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
+
+        for _ in 0..len {
+            let val = T::from_slice_unchecked(slice)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = get_u32_unsafe(slice) as usize;
+        let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
+
+        for _ in 0..len {
+            let val = T::from_slice_unsafe(slice)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(
+        &self,
+        slice: &mut [u8],
+        cursor: &mut usize,
+    ) -> Result<(), RapiraError> {
+        let len = self.len() as u32;
+        len.try_convert_to_bytes(slice, cursor)?;
+
+        for val in self.iter() {
+            val.try_convert_to_bytes(slice, cursor)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let len = self.len() as u32;
+        len.convert_to_bytes(slice, cursor);
+
+        for val in self.iter() {
+            val.convert_to_bytes(slice, cursor);
+        }
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        match T::STATIC_SIZE {
+            Some(size) => 4 + (size * self.len()),
+            None => 4 + self.iter().fold(0, |b, v| b + v.size()),
+        }
+    }
+}
+
+#[cfg(feature = "smallvec")]
+impl<T: Rapira, const CAP: usize> Rapira for SmallVec<[T; CAP]> {
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let mut vec: SmallVec<[T; CAP]> = SmallVec::new_const();
+
+        for _ in 0..len {
+            let val = T::from_slice(slice)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+
+        for _ in 0..len {
+            T::check_bytes(slice)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let mut vec: SmallVec<[T; CAP]> = SmallVec::new_const();
+
+        for _ in 0..len {
+            let val = T::from_slice_unchecked(slice)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = get_u32_unsafe(slice) as usize;
+        let mut vec: SmallVec<[T; CAP]> = SmallVec::new_const();
 
         for _ in 0..len {
             let val = T::from_slice_unsafe(slice)?;

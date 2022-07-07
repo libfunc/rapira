@@ -16,7 +16,7 @@ name = "rapira"
 path = "src/lib.rs"
 
 [features]
-default = ["zerocopy", "std", "json"]
+default = ["zerocopy", "std", "json", "arrayvec", "smallvec"]
 # default = ["zerocopy", "std"]
 # default = ["zerocopy", "alloc"]
 # default = ["zerocopy"]
@@ -37,6 +37,8 @@ rustc-hash = { version = "1.1", optional = true, default-features = false }
 zerocopy = { version = "0.6.1", optional = true, features = ["simd"] }
 serde_json = { version = "1.0", optional = true, default-features = false }
 indexmap = { version = "1.9", optional = true, default-features = false }
+arrayvec = { version = "0.7", optional = true }
+smallvec = { version = "1.8", optional = true, features = ["union", "const_generics", "const_new"] }
 
 [dependencies.time]
 version = "0.3"
