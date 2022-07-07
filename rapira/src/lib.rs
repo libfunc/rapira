@@ -357,6 +357,44 @@ impl_for_integer!(u32);
 impl_for_integer!(u64);
 impl_for_integer!(u128);
 
+impl Rapira for usize {
+    const STATIC_SIZE: Option<usize> = Some(size_of::<u64>());
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        u64::from_slice(slice).map(|u| u as usize)
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    where
+        Self: Sized,
+    {
+        u64::check_bytes(slice)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        u64::from_slice_unsafe(slice).map(|u| u as usize)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        (*self as u64).convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        size_of::<u64>()
+    }
+}
+
 /// # Safety
 ///
 /// This is unsafe.
