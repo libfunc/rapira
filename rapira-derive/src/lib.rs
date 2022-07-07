@@ -34,7 +34,7 @@ fn get_primitive_name(ast: &DeriveInput) -> Option<TokenStream> {
     })
 }
 
-#[proc_macro_derive(Rapira, attributes(idx, coming))]
+#[proc_macro_derive(Rapira, attributes(idx))]
 pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(stream as DeriveInput);
     let name = &ast.ident;
@@ -963,7 +963,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                             if segment.ident != "idx" {
                                                 return None;
                                             }
-                                            match a.parse_args::<Meta>() {
+                                            match a.parse_meta() {
                                                 Ok(Meta::List(list)) => {
                                                     let a = list.nested.first().unwrap();
                                                     let int: u8 = match a {
@@ -975,6 +975,16 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                                         }
                                                     };
                                                     Some(int)
+                                                }
+                                                Ok(Meta::NameValue(name_value)) => {
+                                                    match name_value.lit {
+                                                        Lit::Int(i) => {
+                                                            Some(i.base10_parse::<u8>().unwrap())
+                                                        }
+                                                        _ => {
+                                                            panic!("error meta type")
+                                                        }
+                                                    }
                                                 }
                                                 Ok(_) => None,
                                                 Err(_) => None,
