@@ -10,33 +10,30 @@ use syn::{
 
 // TODO: impl for enum E { A { a_field1, ... }, B { b_field1... } } and enum E { A(B, C) }
 
-fn get_primitive_name(ast: &DeriveInput) -> TokenStream {
-    ast.attrs
-        .iter()
-        .find_map(|attr| {
-            attr.path.segments.first().and_then(|segment| {
-                if segment.ident != "coming" {
-                    return None;
-                }
-                match attr.parse_args::<Meta>() {
-                    Ok(Meta::NameValue(name_value)) => {
-                        if name_value.path.to_token_stream().to_string() != "primitive" {
-                            return None;
-                        }
-                        if let Lit::Str(lit_str) = name_value.lit {
-                            let s = lit_str.parse::<Ident>().unwrap();
-                            let value = s.to_token_stream();
-                            Some(value)
-                        } else {
-                            None
-                        }
+fn get_primitive_name(ast: &DeriveInput) -> Option<TokenStream> {
+    ast.attrs.iter().find_map(|attr| {
+        attr.path.segments.first().and_then(|segment| {
+            if segment.ident != "coming" {
+                return None;
+            }
+            match attr.parse_args::<Meta>() {
+                Ok(Meta::NameValue(name_value)) => {
+                    if name_value.path.to_token_stream().to_string() != "primitive" {
+                        return None;
                     }
-                    Ok(_) => None,
-                    Err(_) => None,
+                    if let Lit::Str(lit_str) = name_value.lit {
+                        let s = lit_str.parse::<Ident>().unwrap();
+                        let value = s.to_token_stream();
+                        Some(value)
+                    } else {
+                        None
+                    }
                 }
-            })
+                Ok(_) => None,
+                Err(_) => None,
+            }
         })
-        .expect("complex enums must include primitive type name!")
+    })
 }
 
 #[proc_macro_derive(Rapira, attributes(idx, coming))]
@@ -488,7 +485,8 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
 
                 proc_macro::TokenStream::from(gen)
             } else {
-                let primitive_name: TokenStream = get_primitive_name(&ast);
+                let primitive_name: TokenStream = get_primitive_name(&ast)
+                    .expect("complex enums must include primitive type name!");
 
                 let mut from_slice: Vec<TokenStream> = Vec::with_capacity(variants_len);
                 let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
@@ -500,88 +498,9 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                 let mut enum_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
 
                 for variant in &data_enum.variants {
-                    if variant.discriminant.is_some() {
-                        // why? because discriminant number may not be equal to primitive number
-                        panic!("enums variants with discriminant not support in current moment");
-                    }
-                    let fields = &variant.fields;
-                    let field = match fields {
-                        Fields::Unit => None,
-                        Fields::Unnamed(fields) => {
-                            let len = fields.unnamed.len();
-                            if len != 1 {
-                                panic!("enums variants is currently support only with 1 unnamed fields");
-                            }
-                            let field = fields.unnamed.first().unwrap();
-                            Some(field.clone())
-                        }
-                        Fields::Named(_) => {
-                            panic!("enums named variants is currently not support");
-                        }
-                    };
                     let variant_name = &variant.ident;
-
-                    match &field {
-                        Some(field) => {
-                            let typ = field.ty.clone();
-
-                            from_slice.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    let v = <#typ>::from_slice(slice)?;
-                                    Ok(#name::#variant_name(v))
-                                }
-                            });
-
-                            check_bytes.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    <#typ>::check_bytes(slice)?;
-                                }
-                            });
-
-                            from_slice_unchecked.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    let v = <#typ>::from_slice_unchecked(slice)?;
-                                    Ok(#name::#variant_name(v))
-                                }
-                            });
-
-                            from_slice_unsafe.push(quote! {
-                                #primitive_name::#variant_name => {
-                                    let v = <#typ>::from_slice_unsafe(slice)?;
-                                    Ok(#name::#variant_name(v))
-                                }
-                            });
-
-                            let try_convert_to_bytes_q = quote! {
-                                #name::#variant_name(v) => {
-                                    v.try_convert_to_bytes(slice, cursor)?;
-                                }
-                            };
-                            try_convert_to_bytes.push(try_convert_to_bytes_q);
-
-                            let convert_to_bytes_q = quote! {
-                                #name::#variant_name(v) => {
-                                    v.convert_to_bytes(slice, cursor);
-                                }
-                            };
-                            convert_to_bytes.push(convert_to_bytes_q);
-
-                            let size_q = quote! {
-                                #name::#variant_name(v) => {
-                                    match <#typ>::STATIC_SIZE {
-                                        Some(s) => s,
-                                        None => v.size(),
-                                    }
-                                },
-                            };
-                            size.push(size_q);
-
-                            let enum_sizes_q = quote! {
-                                <#typ>::STATIC_SIZE,
-                            };
-                            enum_sizes.push(enum_sizes_q);
-                        }
-                        None => {
+                    match &variant.fields {
+                        Fields::Unit => {
                             from_slice.push(quote! {
                                 #primitive_name::#variant_name => {
                                     Ok(#name::#variant_name)
@@ -624,7 +543,314 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             };
                             enum_sizes.push(enum_sizes_q);
                         }
-                    }
+                        Fields::Unnamed(fields) => {
+                            let len = fields.unnamed.len();
+                            if len == 1 {
+                                let field = fields.unnamed.first().unwrap();
+                                let typ = field.ty.clone();
+
+                                from_slice.push(quote! {
+                                    #primitive_name::#variant_name => {
+                                        let v = <#typ>::from_slice(slice)?;
+                                        Ok(#name::#variant_name(v))
+                                    }
+                                });
+
+                                check_bytes.push(quote! {
+                                    #primitive_name::#variant_name => {
+                                        <#typ>::check_bytes(slice)?;
+                                    }
+                                });
+
+                                from_slice_unchecked.push(quote! {
+                                    #primitive_name::#variant_name => {
+                                        let v = <#typ>::from_slice_unchecked(slice)?;
+                                        Ok(#name::#variant_name(v))
+                                    }
+                                });
+
+                                from_slice_unsafe.push(quote! {
+                                    #primitive_name::#variant_name => {
+                                        let v = <#typ>::from_slice_unsafe(slice)?;
+                                        Ok(#name::#variant_name(v))
+                                    }
+                                });
+
+                                let try_convert_to_bytes_q = quote! {
+                                    #name::#variant_name(v) => {
+                                        v.try_convert_to_bytes(slice, cursor)?;
+                                    }
+                                };
+                                try_convert_to_bytes.push(try_convert_to_bytes_q);
+
+                                let convert_to_bytes_q = quote! {
+                                    #name::#variant_name(v) => {
+                                        v.convert_to_bytes(slice, cursor);
+                                    }
+                                };
+                                convert_to_bytes.push(convert_to_bytes_q);
+
+                                let size_q = quote! {
+                                    #name::#variant_name(v) => {
+                                        match <#typ>::STATIC_SIZE {
+                                            Some(s) => s,
+                                            None => v.size(),
+                                        }
+                                    },
+                                };
+                                size.push(size_q);
+
+                                let enum_sizes_q = quote! {
+                                    <#typ>::STATIC_SIZE,
+                                };
+                                enum_sizes.push(enum_sizes_q);
+                            } else {
+                                let unnamed = &fields.unnamed;
+                                let unnamed_len = unnamed.len();
+
+                                let mut field_names: Vec<TokenStream> =
+                                    Vec::with_capacity(unnamed_len);
+                                let mut unnamed_from_slice: Vec<TokenStream> =
+                                    Vec::with_capacity(unnamed_len);
+                                let mut unnamed_check_bytes: Vec<TokenStream> =
+                                    Vec::with_capacity(unnamed_len);
+                                let mut unnamed_from_slice_unchecked: Vec<TokenStream> =
+                                    Vec::with_capacity(unnamed_len);
+                                let mut unnamed_from_slice_unsafe: Vec<TokenStream> =
+                                    Vec::with_capacity(unnamed_len);
+                                let mut unnamed_try_convert_to_bytes: Vec<TokenStream> =
+                                    Vec::with_capacity(unnamed_len);
+                                let mut unnamed_convert_to_bytes: Vec<TokenStream> =
+                                    Vec::with_capacity(unnamed_len);
+                                let mut unnamed_size: Vec<TokenStream> =
+                                    Vec::with_capacity(unnamed_len);
+                                let mut unnamed_static_sizes: Vec<TokenStream> =
+                                    Vec::with_capacity(unnamed_len);
+
+                                for (idx, field) in unnamed.iter().enumerate() {
+                                    let typ = field.ty.clone();
+                                    let field_name =
+                                        syn::Ident::new(&format!("arg{}", idx), Span::call_site());
+
+                                    unnamed_from_slice.push(quote! {
+                                        let #field_name = <#typ>::from_slice(slice)?;
+                                    });
+                                    unnamed_check_bytes.push(quote! {
+                                        <#typ>::check_bytes(slice)?;
+                                    });
+                                    unnamed_from_slice_unchecked.push(quote! {
+                                        let #field_name = <#typ>::from_slice_unchecked(slice)?;
+                                    });
+                                    unnamed_from_slice_unsafe.push(quote! {
+                                        let #field_name = <#typ>::from_slice_unsafe(slice)?;
+                                    });
+                                    unnamed_try_convert_to_bytes.push(quote! {
+                                        #field_name.try_convert_to_bytes(slice, cursor)?;
+                                    });
+                                    unnamed_convert_to_bytes.push(quote! {
+                                        #field_name.convert_to_bytes(slice, cursor);
+                                    });
+                                    unnamed_size.push(quote! { + (match <#typ>::STATIC_SIZE {
+                                        Some(s) => s,
+                                        None => #field_name.size()
+                                    }) });
+                                    unnamed_static_sizes.push(quote! {
+                                        <#typ>::STATIC_SIZE,
+                                    });
+                                    field_names.push(quote! { #field_name, });
+                                }
+
+                                from_slice.push(quote! {
+                                    #primitive_name::#variant_name => {
+                                        #(#unnamed_from_slice)*
+                                        Ok(#name::#variant_name(#(#field_names)*))
+                                    }
+                                });
+
+                                check_bytes.push(quote! {
+                                    #primitive_name::#variant_name => {
+                                        #(#unnamed_check_bytes)*
+                                    }
+                                });
+
+                                from_slice_unchecked.push(quote! {
+                                    #primitive_name::#variant_name => {
+                                        #(#unnamed_from_slice_unchecked)*
+                                        Ok(#name::#variant_name(#(#field_names)*))
+                                    }
+                                });
+
+                                from_slice_unsafe.push(quote! {
+                                    #primitive_name::#variant_name => {
+                                        #(#unnamed_from_slice_unsafe)*
+                                        Ok(#name::#variant_name(#(#field_names)*))
+                                    }
+                                });
+
+                                try_convert_to_bytes.push(quote! {
+                                    #name::#variant_name(#(#field_names)*) => {
+                                        #(#unnamed_try_convert_to_bytes)*
+                                    }
+                                });
+
+                                convert_to_bytes.push(quote! {
+                                    #name::#variant_name(#(#field_names)*) => {
+                                        #(#unnamed_convert_to_bytes)*
+                                    }
+                                });
+
+                                size.push(quote! {
+                                    #name::#variant_name(#(#field_names)*) => {
+                                        0 #(#unnamed_size)*
+                                    },
+                                });
+
+                                enum_sizes.push(quote! {
+                                    rapira::static_size([#(#unnamed_static_sizes)*]),
+                                });
+                            }
+                        }
+                        Fields::Named(fields) => {
+                            let named = &fields.named;
+                            let len = named.len();
+
+                            let mut fields_insert: Vec<(Field, u32)> = Vec::with_capacity(len);
+                            let mut seq = 0u32;
+
+                            for field in named.iter() {
+                                let field_idx = field
+                                    .attrs
+                                    .iter()
+                                    .find_map(|a| {
+                                        a.path.segments.first().and_then(|segment| {
+                                            if segment.ident != "idx" {
+                                                return None;
+                                            }
+                                            match a.parse_args::<Meta>() {
+                                                Ok(Meta::List(list)) => {
+                                                    let a = list.nested.first().unwrap();
+                                                    let int: u32 = match a {
+                                                        NestedMeta::Lit(Lit::Int(i)) => {
+                                                            i.base10_parse::<u32>().unwrap()
+                                                        }
+                                                        _ => {
+                                                            panic!("error meta type")
+                                                        }
+                                                    };
+                                                    Some(int)
+                                                }
+                                                Ok(_) => None,
+                                                Err(_) => None,
+                                            }
+                                        })
+                                    })
+                                    .unwrap_or_else(|| {
+                                        let current_seq = seq;
+                                        seq += 1;
+                                        current_seq
+                                    });
+
+                                fields_insert.push((field.clone(), field_idx));
+                            }
+
+                            fields_insert.sort_by(|(_, idx_a), (_, idx_b)| idx_a.cmp(idx_b));
+
+                            let mut field_names: Vec<TokenStream> = Vec::with_capacity(len);
+                            let mut named_from_slice: Vec<TokenStream> = Vec::with_capacity(len);
+                            let mut named_check_bytes: Vec<TokenStream> = Vec::with_capacity(len);
+                            let mut named_from_slice_unchecked: Vec<TokenStream> =
+                                Vec::with_capacity(len);
+                            let mut named_from_slice_unsafe: Vec<TokenStream> =
+                                Vec::with_capacity(len);
+                            let mut named_try_convert_to_bytes: Vec<TokenStream> =
+                                Vec::with_capacity(len);
+                            let mut named_convert_to_bytes: Vec<TokenStream> =
+                                Vec::with_capacity(len);
+                            let mut named_size: Vec<TokenStream> = Vec::with_capacity(len);
+                            let mut named_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
+
+                            for field in named.iter() {
+                                let typ = field.ty.clone();
+                                let field_name = field.ident.clone().unwrap();
+
+                                named_from_slice.push(quote! {
+                                    let #field_name = <#typ>::from_slice(slice)?;
+                                });
+                                named_check_bytes.push(quote! {
+                                    <#typ>::check_bytes(slice)?;
+                                });
+                                named_from_slice_unchecked.push(quote! {
+                                    let #field_name = <#typ>::from_slice_unchecked(slice)?;
+                                });
+                                named_from_slice_unsafe.push(quote! {
+                                    let #field_name = <#typ>::from_slice_unsafe(slice)?;
+                                });
+                                named_try_convert_to_bytes.push(quote! {
+                                    #field_name.try_convert_to_bytes(slice, cursor)?;
+                                });
+                                named_convert_to_bytes.push(quote! {
+                                    #field_name.convert_to_bytes(slice, cursor);
+                                });
+                                named_size.push(quote! { + (match <#typ>::STATIC_SIZE {
+                                    Some(s) => s,
+                                    None => #field_name.size()
+                                }) });
+                                named_static_sizes.push(quote! {
+                                    <#typ>::STATIC_SIZE,
+                                });
+                                field_names.push(quote! { #field_name, });
+                            }
+
+                            from_slice.push(quote! {
+                                #primitive_name::#variant_name => {
+                                    #(#named_from_slice)*
+                                    Ok(#name::#variant_name{#(#field_names)*})
+                                }
+                            });
+
+                            check_bytes.push(quote! {
+                                #primitive_name::#variant_name => {
+                                    #(#named_check_bytes)*
+                                }
+                            });
+
+                            from_slice_unchecked.push(quote! {
+                                #primitive_name::#variant_name => {
+                                    #(#named_from_slice_unchecked)*
+                                    Ok(#name::#variant_name{#(#field_names)*})
+                                }
+                            });
+
+                            from_slice_unsafe.push(quote! {
+                                #primitive_name::#variant_name => {
+                                    #(#named_from_slice_unsafe)*
+                                    Ok(#name::#variant_name{#(#field_names)*})
+                                }
+                            });
+
+                            try_convert_to_bytes.push(quote! {
+                                #name::#variant_name{#(#field_names)*} => {
+                                    #(#named_try_convert_to_bytes)*
+                                }
+                            });
+
+                            convert_to_bytes.push(quote! {
+                                #name::#variant_name{#(#field_names)*} => {
+                                    #(#named_convert_to_bytes)*
+                                }
+                            });
+
+                            size.push(quote! {
+                                #name::#variant_name{#(#field_names)*} => {
+                                    0 #(#named_size)*
+                                },
+                            });
+
+                            enum_sizes.push(quote! {
+                                rapira::static_size([#(#named_static_sizes)*]),
+                            });
+                        }
+                    };
                 }
 
                 let gen = quote! {
@@ -674,7 +900,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                             Self: Sized,
                         {
                             let val: u8 = u8::from_slice_unsafe(slice)?;
-                            let t = <#primitive_name as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                            let t = <#primitive_name as primitive_enum::UnsafeFromU8>::from_unsafe(val);
                             match t {
                                 #(#from_slice_unsafe)*
                             }
