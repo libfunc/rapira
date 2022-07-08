@@ -9,7 +9,7 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 #[cfg(feature = "arrayvec")]
-use arrayvec::ArrayVec;
+use arrayvec::{ArrayString, ArrayVec};
 
 #[cfg(feature = "smallvec")]
 use smallvec::SmallVec;
@@ -846,9 +846,6 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
         let end = *cursor + CAP;
         let s = unsafe { slice.get_unchecked_mut(*cursor..end) };
         s.copy_from_slice(self);
-        // unsafe {
-        //     *slice = slice.get_unchecked_mut(CAP..) as &'a mut [u8];
-        // };
         *cursor = end;
     }
 
@@ -1053,6 +1050,89 @@ impl<T: Rapira, const CAP: usize> Rapira for ArrayVec<T, CAP> {
             Some(size) => 4 + (size * self.len()),
             None => 4 + self.iter().fold(0, |b, v| b + v.size()),
         }
+    }
+}
+
+#[cfg(feature = "arrayvec")]
+impl<const CAP: usize> Rapira for ArrayString<CAP> {
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
+        let s = if len > 10 {
+            from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?
+        } else {
+            core::str::from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?
+        };
+
+        let s = ArrayString::from(s).unwrap();
+
+        *slice = unsafe { slice.get_unchecked(len..) };
+        Ok(s)
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
+
+        if len > 10 {
+            from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
+        } else {
+            core::str::from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
+        };
+
+        *slice = unsafe { slice.get_unchecked(len..) };
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
+        let s = unsafe {
+            let s = core::str::from_utf8_unchecked(bytes);
+            ArrayString::from(s).unwrap()
+        };
+
+        *slice = unsafe { slice.get_unchecked(len..) };
+        Ok(s)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    where
+        Self: Sized,
+    {
+        let len = get_u32_unsafe(slice) as usize;
+        let bytes = slice.get_unchecked(..len);
+        let s = core::str::from_utf8_unchecked(bytes);
+        let s = ArrayString::from(s).unwrap();
+
+        *slice = slice.get_unchecked(len..);
+        Ok(s)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let len = self.len() as u32;
+        len.convert_to_bytes(slice, cursor);
+
+        extend(slice, cursor, self.as_bytes());
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        4 + self.len()
     }
 }
 
