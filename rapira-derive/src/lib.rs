@@ -56,7 +56,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                     if segment.ident != "idx" {
                                         return None;
                                     }
-                                    match a.parse_args::<Meta>() {
+                                    match a.parse_meta() {
                                         Ok(Meta::List(list)) => {
                                             let a = list.nested.first().unwrap();
                                             let int: u32 = match a {
@@ -69,6 +69,12 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                             };
                                             Some(int)
                                         }
+                                        Ok(Meta::NameValue(nv)) => match nv.lit {
+                                            Lit::Int(i) => Some(i.base10_parse::<u32>().unwrap()),
+                                            _ => {
+                                                panic!("error meta type")
+                                            }
+                                        },
                                         Ok(_) => None,
                                         Err(_) => None,
                                     }
@@ -722,7 +728,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                                     if segment.ident != "idx" {
                                                         return None;
                                                     }
-                                                    match a.parse_args::<Meta>() {
+                                                    match a.parse_meta() {
                                                         Ok(Meta::List(list)) => {
                                                             let a = list.nested.first().unwrap();
                                                             let int: u32 = match a {
@@ -735,6 +741,14 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                                             };
                                                             Some(int)
                                                         }
+                                                        Ok(Meta::NameValue(nv)) => match nv.lit {
+                                                            Lit::Int(i) => Some(
+                                                                i.base10_parse::<u32>().unwrap(),
+                                                            ),
+                                                            _ => {
+                                                                panic!("error meta type")
+                                                            }
+                                                        },
                                                         Ok(_) => None,
                                                         Err(_) => None,
                                                     }
@@ -1151,7 +1165,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                                     if segment.ident != "idx" {
                                                         return None;
                                                     }
-                                                    match a.parse_args::<Meta>() {
+                                                    match a.parse_meta() {
                                                         Ok(Meta::List(list)) => {
                                                             let a = list.nested.first().unwrap();
                                                             let int: u32 = match a {
@@ -1164,6 +1178,14 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                                                             };
                                                             Some(int)
                                                         }
+                                                        Ok(Meta::NameValue(nv)) => match nv.lit {
+                                                            Lit::Int(i) => Some(
+                                                                i.base10_parse::<u32>().unwrap(),
+                                                            ),
+                                                            _ => {
+                                                                panic!("error meta type")
+                                                            }
+                                                        },
                                                         Ok(_) => None,
                                                         Err(_) => None,
                                                     }
