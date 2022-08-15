@@ -1,5 +1,6 @@
 [package]
 name = "rapira-derive"
+description = "serialization library like borsh and bincode"
 version = "0.1.0"
 authors = ["Rail Khusnutdinov <rail@33.run>"]
 keywords = ["serialization"]
