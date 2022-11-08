@@ -175,7 +175,7 @@ impl Rapira for bool {
     where
         Self: Sized,
     {
-        let byte = *slice.get(0).ok_or(RapiraError::SliceLenError)?;
+        let byte = *slice.first().ok_or(RapiraError::SliceLenError)?;
 
         *slice = unsafe { slice.get_unchecked(1..) };
         Ok(byte != 0)
@@ -205,7 +205,7 @@ impl Rapira for bool {
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
         // println!("slice: {slice:?}, cursor: {cursor}");
         let byte = unsafe { slice.get_unchecked_mut(*cursor) };
-        *byte = if *self { 1 } else { 0 };
+        *byte = u8::from(*self);
         *cursor += 1;
     }
 
@@ -238,7 +238,7 @@ impl Rapira for u8 {
     where
         Self: Sized,
     {
-        let byte = *slice.get(0).ok_or(RapiraError::SliceLenError)?;
+        let byte = *slice.first().ok_or(RapiraError::SliceLenError)?;
 
         *slice = unsafe { slice.get_unchecked(1..) };
         Ok(byte)
@@ -1587,7 +1587,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
 
     #[inline]
     fn size(&self) -> usize {
-        0 + (match T0::STATIC_SIZE {
+        (match T0::STATIC_SIZE {
             Some(s) => s,
             None => self.0.size(),
         }) + (match T1::STATIC_SIZE {
@@ -1679,7 +1679,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3)
 
     #[inline]
     fn size(&self) -> usize {
-        0 + (match T0::STATIC_SIZE {
+        (match T0::STATIC_SIZE {
             Some(s) => s,
             None => self.0.size(),
         }) + (match T1::STATIC_SIZE {
