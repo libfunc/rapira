@@ -1,5 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub mod error;
+
+pub use error::{RapiraError, Result};
+
 #[cfg(feature = "std")]
 use std::net::IpAddr;
 
@@ -11,6 +15,8 @@ use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 #[cfg(feature = "arrayvec")]
 use arrayvec::{ArrayString, ArrayVec};
 
+#[cfg(feature = "decimal")]
+use rust_decimal::Decimal;
 #[cfg(feature = "smallvec")]
 use smallvec::SmallVec;
 
@@ -18,60 +24,27 @@ use core::{mem::size_of, num::NonZeroU32};
 pub use rapira_derive::Rapira;
 use simdutf8::basic::from_utf8;
 
-#[cfg(feature = "zerocopy")]
-use core::ops::Deref;
-
-#[cfg(feature = "std")]
-use thiserror::Error;
-
 #[cfg(feature = "map")]
 use indexmap::IndexMap;
 
 #[cfg(feature = "map")]
 use core::hash::BuildHasherDefault;
 
-#[cfg(feature = "zerocopy")]
-use zerocopy::{AsBytes, FromBytes};
-
 #[cfg(feature = "json")]
 use serde_json::{Map, Number, Value};
-
-#[cfg_attr(feature = "std", derive(Error, Debug))]
-pub enum RapiraError {
-    #[cfg_attr(feature = "std", error("iter next error"))]
-    IterNextError,
-    #[cfg_attr(feature = "std", error("string from utf8 error"))]
-    StringTypeError,
-    #[cfg_attr(feature = "std", error("datetime error"))]
-    DatetimeError,
-    #[cfg_attr(feature = "std", error("map insert error: args next error"))]
-    MapInsertError,
-    #[cfg_attr(feature = "std", error("enum variant error"))]
-    EnumVariantError,
-    #[cfg_attr(feature = "std", error("non zero to zero"))]
-    FloatIsNaNError,
-    #[cfg_attr(feature = "std", error("float is NaN"))]
-    NonZeroError,
-    #[cfg_attr(feature = "std", error("slice len error"))]
-    SliceLenError,
-    #[cfg_attr(feature = "std", error("from arr not implemented"))]
-    FromArrNotImplemented,
-    #[cfg(feature = "std")]
-    #[cfg_attr(feature = "std", error("other error: {0}"))]
-    OtherError(String),
-}
 
 pub trait Rapira {
     const STATIC_SIZE: Option<usize> = None;
 
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>;
+
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized;
 
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>;
-
+    /// this mean not unsafe, but unchecked (utf-8 strings not check...)
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -81,16 +54,12 @@ pub trait Rapira {
     /// # Safety
     ///
     /// This is unsafe
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized;
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         self.convert_to_bytes(slice, cursor);
         Ok(())
     }
@@ -111,7 +80,7 @@ pub trait Rapira {
         bytes
     }
 
-    fn deserialize(bytes: &[u8]) -> Result<Self, RapiraError>
+    fn deserialize(bytes: &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -119,7 +88,7 @@ pub trait Rapira {
         Self::from_slice(&mut bytes)
     }
 
-    fn deser_unchecked(bytes: &[u8]) -> Result<Self, RapiraError>
+    fn deser_unchecked(bytes: &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -130,7 +99,7 @@ pub trait Rapira {
     /// # Safety
     ///
     /// This is unsafe
-    unsafe fn deser_unsafe(bytes: &[u8]) -> Result<Self, RapiraError>
+    unsafe fn deser_unsafe(bytes: &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -141,26 +110,31 @@ pub trait Rapira {
 
 impl Rapira for () {
     const STATIC_SIZE: Option<usize> = Some(0);
+
     #[inline]
-    fn from_slice(_: &mut &[u8]) -> Result<Self, RapiraError>
+    fn check_bytes(_: &mut &[u8]) -> Result<()> {
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice(_: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
         Ok(())
     }
+
     #[inline]
-    fn check_bytes(_: &mut &[u8]) -> Result<(), RapiraError> {
-        Ok(())
-    }
-    #[inline]
-    unsafe fn from_slice_unsafe(_: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(_: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
         Ok(())
     }
+
     #[inline]
     fn convert_to_bytes(&self, _: &mut [u8], _: &mut usize) {}
+
     #[inline]
     fn size(&self) -> usize {
         0
@@ -171,7 +145,7 @@ impl Rapira for bool {
     const STATIC_SIZE: Option<usize> = Some(1);
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -182,7 +156,7 @@ impl Rapira for bool {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -192,7 +166,7 @@ impl Rapira for bool {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -215,69 +189,65 @@ impl Rapira for bool {
     }
 }
 
-#[cfg(test)]
-mod tests {
+pub mod byte_rapira {
     use super::*;
 
-    #[test]
-    fn test_bool() {
-        let bytes = true.serialize();
-        assert_eq!(bytes.len(), 1);
-        let val = bool::deserialize(&bytes).unwrap();
-        assert!(val);
-        let val = unsafe { bool::deser_unsafe(&bytes).unwrap() };
-        assert!(val);
+    pub const fn static_size<T>() -> Option<usize> {
+        Some(1)
     }
-}
-
-impl Rapira for u8 {
-    const STATIC_SIZE: Option<usize> = Some(1);
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
-    where
-        Self: Sized,
-    {
-        let byte = *slice.first().ok_or(RapiraError::SliceLenError)?;
+    pub fn size(_: &u8) -> usize {
+        1
+    }
 
+    #[inline]
+    pub fn check_bytes<T>(slice: &mut &[u8]) -> Result<()> {
+        *slice = slice.get(1..).ok_or(RapiraError::SliceLenError)?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn from_slice(slice: &mut &[u8]) -> Result<u8> {
+        let byte = *slice.first().ok_or(RapiraError::SliceLenError)?;
         *slice = unsafe { slice.get_unchecked(1..) };
         Ok(byte)
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
-    where
-        Self: Sized,
-    {
-        *slice = slice.get(1..).ok_or(RapiraError::SliceLenError)?;
-
-        Ok(())
+    pub fn from_slice_unchecked(slice: &mut &[u8]) -> Result<u8> {
+        from_slice(slice)
     }
 
+    /// ...
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if ...
+    ///
+    /// # Safety
+    ///
+    /// this is unsafe
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
-    where
-        Self: Sized,
-    {
+    pub unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<u8> {
         let byte = *slice.get_unchecked(0);
-
         *slice = slice.get_unchecked(1..);
         Ok(byte)
     }
 
     #[inline]
-    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+    pub fn convert_to_bytes(item: &u8, slice: &mut [u8], cursor: &mut usize) {
         let byte = unsafe { slice.get_unchecked_mut(*cursor) };
-        *byte = *self;
-        // unsafe {
-        //     *slice = slice.get_unchecked_mut(1..) as &'a mut [u8];
-        // };
+        *byte = *item;
         *cursor += 1;
     }
 
     #[inline]
-    fn size(&self) -> usize {
-        1
+    pub fn try_convert_to_bytes(item: &u8, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        let byte = unsafe { slice.get_unchecked_mut(*cursor) };
+        *byte = *item;
+        *cursor += 1;
+        Ok(())
     }
 }
 
@@ -287,7 +257,7 @@ macro_rules! impl_for_integer {
             const STATIC_SIZE: Option<usize> = Some(size_of::<$type>());
 
             #[inline]
-            fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+            fn from_slice(slice: &mut &[u8]) -> Result<Self>
             where
                 Self: Sized,
             {
@@ -303,7 +273,7 @@ macro_rules! impl_for_integer {
             }
 
             #[inline]
-            fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+            fn check_bytes(slice: &mut &[u8]) -> Result<()>
             where
                 Self: Sized,
             {
@@ -315,7 +285,7 @@ macro_rules! impl_for_integer {
             }
 
             #[inline]
-            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
             where
                 Self: Sized,
             {
@@ -361,7 +331,7 @@ impl Rapira for usize {
     const STATIC_SIZE: Option<usize> = Some(size_of::<u64>());
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -369,7 +339,7 @@ impl Rapira for usize {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -377,7 +347,7 @@ impl Rapira for usize {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -395,6 +365,44 @@ impl Rapira for usize {
     }
 }
 
+impl Rapira for isize {
+    const STATIC_SIZE: Option<usize> = Some(size_of::<i64>());
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        i64::from_slice(slice).map(|u| u as isize)
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        i64::check_bytes(slice)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        i64::from_slice_unsafe(slice).map(|u| u as isize)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        (*self as i64).convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        size_of::<i64>()
+    }
+}
+
 /// # Safety
 ///
 /// This is unsafe.
@@ -405,8 +413,6 @@ pub unsafe fn get_u32_unsafe(slice: &mut &[u8]) -> u32 {
     let arr: &[u8; 4] = core::mem::transmute_copy(&bytes);
     let u = u32::from_le_bytes(*arr);
 
-    // let u: u32 = core::mem::transmute_copy(bytes);
-
     *slice = slice.get_unchecked(4..);
     u
 }
@@ -415,7 +421,7 @@ impl Rapira for NonZeroU32 {
     const STATIC_SIZE: Option<usize> = Some(size_of::<Self>());
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -427,7 +433,7 @@ impl Rapira for NonZeroU32 {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -439,7 +445,7 @@ impl Rapira for NonZeroU32 {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -466,7 +472,7 @@ impl Rapira for f32 {
     const STATIC_SIZE: Option<usize> = Some(size_of::<Self>());
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -482,7 +488,7 @@ impl Rapira for f32 {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -503,7 +509,7 @@ impl Rapira for f32 {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -518,11 +524,7 @@ impl Rapira for f32 {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         if self.is_nan() {
             return Err(RapiraError::FloatIsNaNError);
         }
@@ -552,7 +554,7 @@ impl Rapira for f64 {
     const STATIC_SIZE: Option<usize> = Some(size_of::<Self>());
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -568,7 +570,7 @@ impl Rapira for f64 {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -589,7 +591,7 @@ impl Rapira for f64 {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -604,11 +606,7 @@ impl Rapira for f64 {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         if self.is_nan() {
             return Err(RapiraError::FloatIsNaNError);
         }
@@ -637,7 +635,7 @@ impl Rapira for f64 {
 #[cfg(feature = "alloc")]
 impl Rapira for String {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -656,7 +654,7 @@ impl Rapira for String {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -674,7 +672,7 @@ impl Rapira for String {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -690,7 +688,7 @@ impl Rapira for String {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -718,36 +716,9 @@ impl Rapira for String {
 }
 
 #[cfg(feature = "alloc")]
-#[derive(Clone, Debug)]
-pub struct Bytes(Vec<u8>);
-
-#[cfg(feature = "alloc")]
-impl From<Vec<u8>> for Bytes {
-    fn from(bytes: Vec<u8>) -> Self {
-        Bytes(bytes)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl From<Bytes> for Vec<u8> {
-    fn from(bytes: Bytes) -> Self {
-        bytes.0
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl Deref for Bytes {
-    type Target = Vec<u8>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl Rapira for Bytes {
+impl Rapira for Vec<u8> {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -755,11 +726,11 @@ impl Rapira for Bytes {
         let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
 
         *slice = unsafe { slice.get_unchecked(len..) };
-        Ok(Bytes(bytes.to_vec()))
+        Ok(bytes.to_vec())
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -770,7 +741,7 @@ impl Rapira for Bytes {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -778,26 +749,19 @@ impl Rapira for Bytes {
         let bytes = slice.get_unchecked(..len);
 
         *slice = slice.get_unchecked(len..);
-        Ok(Bytes(bytes.to_vec()))
+        Ok(bytes.to_vec())
     }
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        let len = self.0.len() as u32;
+        let len = self.len() as u32;
         len.convert_to_bytes(slice, cursor);
-        extend(slice, cursor, &self.0);
+        extend(slice, cursor, self);
     }
 
     #[inline]
     fn size(&self) -> usize {
-        4 + self.0.len()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl Bytes {
-    pub fn get_owned(self) -> Vec<u8> {
-        self.0
+        4 + self.len()
     }
 }
 
@@ -805,7 +769,7 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
     const STATIC_SIZE: Option<usize> = Some(CAP);
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -820,7 +784,7 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -829,7 +793,7 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -855,10 +819,89 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
     }
 }
 
+impl<T: Rapira, const CAP: usize> Rapira for [T; CAP] {
+    const STATIC_SIZE: Option<usize> = static_size([T::STATIC_SIZE; CAP]);
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()> {
+        for _ in 0..CAP {
+            T::check_bytes(slice)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut vec: Vec<T> = Vec::with_capacity(CAP);
+
+        for _ in 0..CAP {
+            let val = T::from_slice(slice)?;
+            vec.push(val);
+        }
+
+        let arr: [T; CAP] = vec.try_into().map_err(|_| RapiraError::SliceLenError)?;
+
+        Ok(arr)
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut vec: Vec<T> = Vec::with_capacity(CAP);
+
+        for _ in 0..CAP {
+            let val = T::from_slice_unchecked(slice)?;
+            vec.push(val);
+        }
+
+        let arr: [T; CAP] = vec.try_into().map_err(|_| RapiraError::SliceLenError)?;
+
+        Ok(arr)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut vec: Vec<T> = Vec::with_capacity(CAP);
+
+        for _ in 0..CAP {
+            let val = T::from_slice_unsafe(slice)?;
+            vec.push(val);
+        }
+
+        let arr: [T; CAP] = vec.try_into().map_err(|_| RapiraError::SliceLenError)?;
+
+        Ok(arr)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        for val in self.iter() {
+            val.convert_to_bytes(slice, cursor);
+        }
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        match T::STATIC_SIZE {
+            Some(size) => size * CAP,
+            None => self.iter().map(|i| i.size()).sum(),
+        }
+    }
+}
+
 #[cfg(feature = "alloc")]
 impl<T: Rapira> Rapira for Vec<T> {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -874,7 +917,7 @@ impl<T: Rapira> Rapira for Vec<T> {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -888,7 +931,7 @@ impl<T: Rapira> Rapira for Vec<T> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -904,7 +947,7 @@ impl<T: Rapira> Rapira for Vec<T> {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -920,11 +963,7 @@ impl<T: Rapira> Rapira for Vec<T> {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         let len = self.len() as u32;
         len.try_convert_to_bytes(slice, cursor)?;
 
@@ -957,7 +996,7 @@ impl<T: Rapira> Rapira for Vec<T> {
 #[cfg(feature = "arrayvec")]
 impl<T: Rapira, const CAP: usize> Rapira for ArrayVec<T, CAP> {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -973,7 +1012,7 @@ impl<T: Rapira, const CAP: usize> Rapira for ArrayVec<T, CAP> {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -987,7 +1026,7 @@ impl<T: Rapira, const CAP: usize> Rapira for ArrayVec<T, CAP> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1003,7 +1042,7 @@ impl<T: Rapira, const CAP: usize> Rapira for ArrayVec<T, CAP> {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1019,11 +1058,7 @@ impl<T: Rapira, const CAP: usize> Rapira for ArrayVec<T, CAP> {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         let len = self.len() as u32;
         len.try_convert_to_bytes(slice, cursor)?;
 
@@ -1056,7 +1091,7 @@ impl<T: Rapira, const CAP: usize> Rapira for ArrayVec<T, CAP> {
 #[cfg(feature = "arrayvec")]
 impl<const CAP: usize> Rapira for ArrayString<CAP> {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1075,7 +1110,7 @@ impl<const CAP: usize> Rapira for ArrayString<CAP> {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -1093,7 +1128,7 @@ impl<const CAP: usize> Rapira for ArrayString<CAP> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1109,7 +1144,7 @@ impl<const CAP: usize> Rapira for ArrayString<CAP> {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1139,7 +1174,7 @@ impl<const CAP: usize> Rapira for ArrayString<CAP> {
 #[cfg(feature = "smallvec")]
 impl<T: Rapira, const CAP: usize> Rapira for SmallVec<[T; CAP]> {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1155,7 +1190,7 @@ impl<T: Rapira, const CAP: usize> Rapira for SmallVec<[T; CAP]> {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -1169,7 +1204,7 @@ impl<T: Rapira, const CAP: usize> Rapira for SmallVec<[T; CAP]> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1185,7 +1220,7 @@ impl<T: Rapira, const CAP: usize> Rapira for SmallVec<[T; CAP]> {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1201,11 +1236,7 @@ impl<T: Rapira, const CAP: usize> Rapira for SmallVec<[T; CAP]> {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         let len = self.len() as u32;
         len.try_convert_to_bytes(slice, cursor)?;
 
@@ -1267,11 +1298,11 @@ impl<T: Rapira> Rapira for Option<T> {
     const STATIC_SIZE: Option<usize> = enum_static_size(T::STATIC_SIZE);
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
-        let b = u8::from_slice(slice)?;
+        let b = byte_rapira::from_slice(slice)?;
         if b != 0 {
             let t = T::from_slice(slice)?;
             Ok(Some(t))
@@ -1281,11 +1312,11 @@ impl<T: Rapira> Rapira for Option<T> {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
-        let b = u8::from_slice(slice)?;
+        let b = byte_rapira::from_slice(slice)?;
         if b != 0 {
             T::check_bytes(slice)?;
         }
@@ -1294,11 +1325,11 @@ impl<T: Rapira> Rapira for Option<T> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
-        let b = u8::from_slice(slice)?;
+        let b = byte_rapira::from_slice(slice)?;
         if b != 0 {
             let t = T::from_slice_unchecked(slice)?;
             Ok(Some(t))
@@ -1308,11 +1339,11 @@ impl<T: Rapira> Rapira for Option<T> {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
-        let b = u8::from_slice_unsafe(slice)?;
+        let b = byte_rapira::from_slice_unsafe(slice)?;
         if b != 0 {
             let t = T::from_slice_unsafe(slice)?;
             Ok(Some(t))
@@ -1322,11 +1353,7 @@ impl<T: Rapira> Rapira for Option<T> {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         match self.as_ref() {
             Some(s) => {
                 push(slice, cursor, 1);
@@ -1366,7 +1393,7 @@ impl<T: Rapira> Rapira for Box<T> {
     const STATIC_SIZE: Option<usize> = T::STATIC_SIZE;
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1375,7 +1402,7 @@ impl<T: Rapira> Rapira for Box<T> {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -1383,7 +1410,7 @@ impl<T: Rapira> Rapira for Box<T> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1392,7 +1419,7 @@ impl<T: Rapira> Rapira for Box<T> {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1401,11 +1428,7 @@ impl<T: Rapira> Rapira for Box<T> {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         self.as_ref().try_convert_to_bytes(slice, cursor)
     }
 
@@ -1448,7 +1471,7 @@ impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
     const STATIC_SIZE: Option<usize> = static_size([T0::STATIC_SIZE, T1::STATIC_SIZE]);
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1458,7 +1481,7 @@ impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -1468,7 +1491,7 @@ impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1478,7 +1501,7 @@ impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1488,11 +1511,7 @@ impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         self.0.try_convert_to_bytes(slice, cursor)?;
         self.1.try_convert_to_bytes(slice, cursor)?;
         Ok(())
@@ -1523,7 +1542,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
         static_size([T0::STATIC_SIZE, T1::STATIC_SIZE, T2::STATIC_SIZE]);
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1534,7 +1553,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -1545,7 +1564,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1556,7 +1575,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1567,11 +1586,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         self.0.try_convert_to_bytes(slice, cursor)?;
         self.1.try_convert_to_bytes(slice, cursor)?;
         self.2.try_convert_to_bytes(slice, cursor)?;
@@ -1609,7 +1624,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3)
     ]);
 
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1621,7 +1636,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3)
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -1633,7 +1648,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3)
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1645,7 +1660,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3)
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1657,11 +1672,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3)
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         self.0.try_convert_to_bytes(slice, cursor)?;
         self.1.try_convert_to_bytes(slice, cursor)?;
         self.2.try_convert_to_bytes(slice, cursor)?;
@@ -1701,7 +1712,7 @@ where
     K: Ord,
 {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError> {
+    fn from_slice(slice: &mut &[u8]) -> Result<Self> {
         let len = u32::from_slice(slice)? as usize;
         let mut map = BTreeMap::<K, V>::new();
         for _ in 0..len {
@@ -1713,7 +1724,7 @@ where
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -1728,7 +1739,7 @@ where
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError> {
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self> {
         let len = u32::from_slice(slice)? as usize;
         let mut map = BTreeMap::<K, V>::new();
         for _ in 0..len {
@@ -1740,7 +1751,7 @@ where
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1755,11 +1766,7 @@ where
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         let len = self.len() as u32;
         len.try_convert_to_bytes(slice, cursor)?;
         for (key, value) in self {
@@ -1802,7 +1809,7 @@ where
     S: core::hash::Hasher + core::default::Default,
 {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1818,7 +1825,7 @@ where
         Ok(map)
     }
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
@@ -1830,7 +1837,7 @@ where
         Ok(())
     }
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1846,7 +1853,7 @@ where
         Ok(map)
     }
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1862,11 +1869,7 @@ where
         Ok(map)
     }
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         let len = self.len() as u32;
         len.try_convert_to_bytes(slice, cursor)?;
         for (key, value) in self {
@@ -1903,11 +1906,11 @@ where
 #[cfg(feature = "std")]
 impl Rapira for IpAddr {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
-        let b = u8::from_slice(slice)?;
+        let b = byte_rapira::from_slice(slice)?;
         if b == 0 {
             let v4 = <[u8; 4]>::from_slice(slice)?;
             Ok(IpAddr::from(v4))
@@ -1918,11 +1921,11 @@ impl Rapira for IpAddr {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
-        let b = u8::from_slice(slice)?;
+        let b = byte_rapira::from_slice(slice)?;
 
         if b == 0 {
             <[u8; 4]>::check_bytes(slice)?;
@@ -1934,11 +1937,11 @@ impl Rapira for IpAddr {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
-        let b = u8::from_slice_unsafe(slice)?;
+        let b = byte_rapira::from_slice_unsafe(slice)?;
         if b == 0 {
             let v4 = <[u8; 4]>::from_slice_unsafe(slice)?;
             Ok(IpAddr::from(v4))
@@ -2003,40 +2006,25 @@ pub const fn enum_size<const N: usize>(arr: [Option<usize>; N]) -> Option<usize>
 }
 
 #[cfg(feature = "zerocopy")]
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
-pub struct ZeroCopy<T: FromBytes + AsBytes + Sized>(T);
+pub mod zero {
+    use core::mem::size_of;
 
-#[cfg(feature = "zerocopy")]
-impl<T: FromBytes + AsBytes + Sized> Deref for ZeroCopy<T> {
-    type Target = T;
+    use super::*;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+    #[cfg(feature = "zerocopy")]
+    use zerocopy::{AsBytes, FromBytes};
 
-#[cfg(feature = "zerocopy")]
-impl<T: FromBytes + AsBytes + Sized> Rapira for ZeroCopy<T> {
-    const STATIC_SIZE: Option<usize> = Some(size_of::<T>());
-
-    #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    pub const fn static_size<T>() -> Option<usize>
     where
-        Self: Sized,
+        T: FromBytes + AsBytes + Sized,
     {
-        let size = size_of::<T>();
-        let bytes: &[u8] = slice.get(..size).ok_or(RapiraError::SliceLenError)?;
-
-        *slice = unsafe { slice.get_unchecked(size..) };
-
-        let t = T::read_from(bytes).unwrap();
-        Ok(ZeroCopy(t))
+        Some(size_of::<T>())
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    pub fn check_bytes<T>(slice: &mut &[u8]) -> Result<()>
     where
-        Self: Sized,
+        T: FromBytes + AsBytes + Sized,
     {
         let size = size_of::<T>();
 
@@ -2046,27 +2034,77 @@ impl<T: FromBytes + AsBytes + Sized> Rapira for ZeroCopy<T> {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    pub fn from_slice<T>(slice: &mut &[u8]) -> Result<T>
     where
-        Self: Sized,
+        T: FromBytes + AsBytes + Sized,
+    {
+        let size = size_of::<T>();
+        let bytes: &[u8] = slice.get(..size).ok_or(RapiraError::SliceLenError)?;
+
+        *slice = unsafe { slice.get_unchecked(size..) };
+
+        let t: T = FromBytes::read_from(bytes).unwrap();
+        Ok(t)
+    }
+
+    #[inline]
+    pub fn from_slice_unchecked<T>(slice: &mut &[u8]) -> Result<T>
+    where
+        T: FromBytes + AsBytes + Sized,
+    {
+        from_slice(slice)
+    }
+
+    /// .
+    ///
+    /// # Panics
+    ///
+    /// Panics if .
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if .
+    ///
+    /// # Safety
+    ///
+    /// .
+    #[inline]
+    pub unsafe fn from_slice_unsafe<T>(slice: &mut &[u8]) -> Result<T>
+    where
+        T: FromBytes + AsBytes + Sized,
     {
         let size = size_of::<T>();
         let bytes: &[u8] = slice.get_unchecked(..size);
 
-        *slice = slice.get_unchecked(4..);
+        *slice = slice.get_unchecked(size..);
 
-        let t = T::read_from(bytes).unwrap();
-        Ok(ZeroCopy(t))
+        let t: T = FromBytes::read_from(bytes).unwrap();
+        Ok(t)
     }
 
     #[inline]
-    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        let bytes = self.as_bytes();
+    pub fn convert_to_bytes<T>(item: &T, slice: &mut [u8], cursor: &mut usize)
+    where
+        T: FromBytes + AsBytes + Sized,
+    {
+        let bytes = item.as_bytes();
         extend(slice, cursor, bytes);
     }
 
     #[inline]
-    fn size(&self) -> usize {
+    pub fn try_convert_to_bytes<T>(item: &T, slice: &mut [u8], cursor: &mut usize) -> Result<()>
+    where
+        T: FromBytes + AsBytes + Sized,
+    {
+        convert_to_bytes(item, slice, cursor);
+        Ok(())
+    }
+
+    #[inline]
+    pub fn size<T>(_: &T) -> usize
+    where
+        T: FromBytes + AsBytes + Sized,
+    {
         size_of::<T>()
     }
 }
@@ -2074,11 +2112,11 @@ impl<T: FromBytes + AsBytes + Sized> Rapira for ZeroCopy<T> {
 #[cfg(feature = "json")]
 impl Rapira for Value {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
-        let byte = u8::from_slice(slice)?;
+        let byte = byte_rapira::from_slice(slice)?;
         match byte {
             0 => Ok(Value::Null),
             1 => {
@@ -2086,7 +2124,7 @@ impl Rapira for Value {
                 Ok(Value::Bool(b))
             }
             2 => {
-                let byte = u8::from_slice(slice)?;
+                let byte = byte_rapira::from_slice(slice)?;
                 if byte == 0 {
                     let u = u64::from_slice(slice)?;
                     Ok(Value::Number(u.into()))
@@ -2124,18 +2162,18 @@ impl Rapira for Value {
     }
 
     #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<(), RapiraError>
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
     {
-        let byte = u8::from_slice(slice)?;
+        let byte = byte_rapira::from_slice(slice)?;
         match byte {
             0 => {}
             1 => {
                 bool::check_bytes(slice)?;
             }
             2 => {
-                let byte = u8::from_slice(slice)?;
+                let byte = byte_rapira::from_slice(slice)?;
                 if byte == 0 {
                     u64::check_bytes(slice)?;
                 } else if byte == 1 {
@@ -2166,11 +2204,11 @@ impl Rapira for Value {
     }
 
     #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self, RapiraError>
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
-        let byte = u8::from_slice_unsafe(slice)?;
+        let byte = byte_rapira::from_slice_unsafe(slice)?;
         match byte {
             0 => Ok(Value::Null),
             1 => {
@@ -2178,7 +2216,7 @@ impl Rapira for Value {
                 Ok(Value::Bool(b))
             }
             2 => {
-                let byte = u8::from_slice_unsafe(slice)?;
+                let byte = byte_rapira::from_slice_unsafe(slice)?;
                 if byte == 0 {
                     let u = u64::from_slice_unsafe(slice)?;
                     Ok(Value::Number(u.into()))
@@ -2259,11 +2297,7 @@ impl Rapira for Value {
     }
 
     #[inline]
-    fn try_convert_to_bytes(
-        &self,
-        slice: &mut [u8],
-        cursor: &mut usize,
-    ) -> Result<(), RapiraError> {
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         match self {
             Value::Null => {
                 push(slice, cursor, 0);
@@ -2323,5 +2357,38 @@ impl Rapira for Value {
                     .fold(0, |acc, item| acc + item.0.size() + item.1.size())
             }
         }
+    }
+}
+
+#[cfg(feature = "decimal")]
+impl Rapira for Decimal {
+    const STATIC_SIZE: Option<usize> = Some(16);
+
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let bytes = <[u8; 16]>::from_slice_unsafe(slice)?;
+        Ok(Decimal::deserialize(bytes))
+    }
+
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let bytes = <[u8; 16]>::from_slice(slice)?;
+        Ok(Decimal::deserialize(bytes))
+    }
+
+    fn check_bytes(_: &mut &[u8]) -> Result<()> {
+        Ok(())
+    }
+
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.serialize().convert_to_bytes(slice, cursor);
+    }
+
+    fn size(&self) -> usize {
+        16
     }
 }
