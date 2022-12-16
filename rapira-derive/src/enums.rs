@@ -4,11 +4,15 @@ extern crate syn;
 
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{DataEnum, Field, Fields, Lit, Meta, NestedMeta};
+use syn::{DataEnum, Expr, Field, Fields, Lit, Meta, NestedMeta};
 
 use crate::utils::{extract_idx_attr, extract_with_attr};
 
-pub fn enum_serializer(data_enum: &DataEnum, name: &Ident) -> proc_macro::TokenStream {
+pub fn enum_serializer(
+    data_enum: &DataEnum,
+    name: &Ident,
+    skip_static_size: Option<Expr>,
+) -> proc_macro::TokenStream {
     let variants_len = data_enum.variants.len();
 
     let mut enum_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
@@ -374,9 +378,22 @@ pub fn enum_serializer(data_enum: &DataEnum, name: &Ident) -> proc_macro::TokenS
         }
     }
 
+    let static_size = match skip_static_size {
+        Some(skip_static_size) => {
+            quote! {
+                #skip_static_size
+            }
+        }
+        None => {
+            quote! {
+                rapira::enum_size([#(#enum_sizes)*])
+            }
+        }
+    };
+
     let gen = quote! {
         impl rapira::Rapira for #name {
-            const STATIC_SIZE: Option<usize> = rapira::enum_size([#(#enum_sizes)*]);
+            const STATIC_SIZE: Option<usize> = #static_size;
 
             #[inline]
             fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>

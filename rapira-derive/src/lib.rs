@@ -2,9 +2,9 @@ extern crate proc_macro2;
 extern crate quote;
 extern crate syn;
 
+mod attributes;
 mod enum_with_primitive;
 mod enums;
-mod get_primitive_name;
 mod simple_enum;
 mod structs;
 mod utils;
@@ -20,6 +20,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
     let ast = parse_macro_input!(stream as DeriveInput);
     let name = &ast.ident;
     let data = &ast.data;
+
     match data {
         Data::Struct(data_struct) => struct_serializer(data_struct, name),
         Data::Enum(data_enum) => {
@@ -27,17 +28,21 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
             if is_simple_enum {
                 simple_enum_serializer(name)
             } else {
-                let primitive_name = get_primitive_name::get_primitive_name(&ast.attrs);
+                let primitive_name = attributes::get_primitive_name(&ast.attrs);
+
                 match primitive_name {
                     Some(primitive_name) => {
                         enum_with_primitive_serializer(data_enum, name, &primitive_name)
                     }
-                    None => enum_serializer(data_enum, name),
+                    None => {
+                        let skip_static_size = attributes::skip_static_size(&ast.attrs);
+                        enum_serializer(data_enum, name, skip_static_size)
+                    }
                 }
             }
         }
         Data::Union(_) => {
-            panic!("unions not supported, but Rust enums is implemented GetType trait (use Enums instead)")
+            panic!("unions not supported, but Rust enums is implemented Rapira trait (use Enums instead)")
         }
     }
 }

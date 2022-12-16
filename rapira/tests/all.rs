@@ -103,6 +103,14 @@ enum FullEnum {
     D,
 }
 
+#[derive(Debug, Rapira, PartialEq)]
+#[rapira(static_size = "None")]
+enum NonStaticSized {
+    A(String),
+    B(Box<NonStaticSized>),
+    C,
+}
+
 #[test]
 fn test_enum() -> Result<()> {
     let zero = Zero {
@@ -130,6 +138,10 @@ fn test_enum() -> Result<()> {
     let d = FullEnum::D;
     let vec = d.serialize();
     assert!(d == FullEnum::deserialize(&vec)?);
+
+    let e = NonStaticSized::B(Box::new(NonStaticSized::A(String::from("asd"))));
+    let vec = e.serialize();
+    assert!(e == NonStaticSized::deserialize(&vec)?);
 
     Ok(())
 }
