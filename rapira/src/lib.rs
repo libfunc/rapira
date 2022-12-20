@@ -14,6 +14,8 @@ extern crate alloc;
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 #[cfg(feature = "arrayvec")]
 use arrayvec::{ArrayString, ArrayVec};
+#[cfg(feature = "compact_str")]
+use compact_str::CompactString;
 
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
@@ -2390,5 +2392,73 @@ impl Rapira for Decimal {
 
     fn size(&self) -> usize {
         16
+    }
+}
+
+#[cfg(feature = "compact_str")]
+impl Rapira for CompactString {
+    fn check_bytes(slice: &mut &[u8]) -> Result<()> {
+        let len = u32::from_slice(slice)? as usize;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
+
+        if len > 10 {
+            from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
+        } else {
+            core::str::from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
+        };
+
+        *slice = unsafe { slice.get_unchecked(len..) };
+        Ok(())
+    }
+
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
+        let s = if len > 10 {
+            CompactString::from(from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?)
+        } else {
+            CompactString::from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?
+        };
+
+        *slice = unsafe { slice.get_unchecked(len..) };
+        Ok(s)
+    }
+
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let len = get_u32_unsafe(slice) as usize;
+        let bytes = slice.get_unchecked(..len);
+
+        let s = CompactString::from_utf8_unchecked(bytes);
+
+        *slice = slice.get_unchecked(len..);
+        Ok(s)
+    }
+
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let len = self.len() as u32;
+        len.convert_to_bytes(slice, cursor);
+        extend(slice, cursor, self.as_bytes());
+    }
+
+    fn size(&self) -> usize {
+        4 + self.len()
+    }
+
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
+        let s = unsafe { CompactString::from_utf8_unchecked(bytes) };
+
+        *slice = unsafe { slice.get_unchecked(len..) };
+        Ok(s)
     }
 }

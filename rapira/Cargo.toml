@@ -17,7 +17,7 @@ name = "rapira"
 path = "src/lib.rs"
 
 [features]
-default = ["zerocopy", "std", "json", "arrayvec", "smallvec", "decimal"]
+default = ["zerocopy", "std", "json", "arrayvec", "smallvec", "decimal", "compact_str"]
 # default = ["zerocopy", "std"]
 # default = ["zerocopy", "alloc"]
 # default = ["zerocopy"]
@@ -44,6 +44,7 @@ arrayvec = { version = "0.7", optional = true }
 smallvec = { version = "1.8", optional = true, features = ["union", "const_generics", "const_new"] }
 rust_decimal = { version = "1.27", optional = true }
 time = { version = "0.3", default-features = false }
+compact_str = { version = "0.6", optional = true, features = ["bytes", "serde"] }
 
 [target.'cfg(not(target_env = "aarch64-apple-darwin"))'.dependencies]
 simdutf8 = { version = "0.1", default-features = false }
