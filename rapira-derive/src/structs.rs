@@ -4,11 +4,18 @@ extern crate syn;
 
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{DataStruct, ExprPath, Field, Fields, LitInt};
+use syn::{DataStruct, ExprPath, Field, Fields, Generics, LitInt};
 
-use crate::utils::{extract_idx_attr, extract_with_attr};
+use crate::{
+    shared::build_ident,
+    utils::{extract_idx_attr, extract_with_attr},
+};
 
-pub fn struct_serializer(data_struct: &DataStruct, name: &Ident) -> proc_macro::TokenStream {
+pub fn struct_serializer(
+    data_struct: &DataStruct,
+    name: &Ident,
+    generics: Generics,
+) -> proc_macro::TokenStream {
     let fields = &data_struct.fields;
     match fields {
         Fields::Named(fields) => {
@@ -107,8 +114,10 @@ pub fn struct_serializer(data_struct: &DataStruct, name: &Ident) -> proc_macro::
                 }
             }
 
+            let name_with_generics = build_ident(name, generics);
+
             let gen = quote! {
-                impl rapira::Rapira for #name {
+                #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
 
                     #[inline]
@@ -252,8 +261,10 @@ pub fn struct_serializer(data_struct: &DataStruct, name: &Ident) -> proc_macro::
                 }
             }
 
+            let name_with_generics = build_ident(name, generics);
+
             let gen = quote! {
-                impl rapira::Rapira for #name {
+                #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
 
                     #[inline]

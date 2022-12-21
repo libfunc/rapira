@@ -4,14 +4,18 @@ extern crate syn;
 
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{DataEnum, Expr, Field, Fields, Lit, Meta, NestedMeta};
+use syn::{DataEnum, Expr, Field, Fields, Generics, Lit, Meta, NestedMeta};
 
-use crate::utils::{extract_idx_attr, extract_with_attr};
+use crate::{
+    shared::build_ident,
+    utils::{extract_idx_attr, extract_with_attr},
+};
 
 pub fn enum_serializer(
     data_enum: &DataEnum,
     name: &Ident,
     skip_static_size: Option<Expr>,
+    generics: Generics,
 ) -> proc_macro::TokenStream {
     let variants_len = data_enum.variants.len();
 
@@ -391,8 +395,10 @@ pub fn enum_serializer(
         }
     };
 
+    let name_with_generics = build_ident(name, generics);
+
     let gen = quote! {
-        impl rapira::Rapira for #name {
+        #name_with_generics {
             const STATIC_SIZE: Option<usize> = #static_size;
 
             #[inline]

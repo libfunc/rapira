@@ -5,6 +5,7 @@ extern crate syn;
 mod attributes;
 mod enum_with_primitive;
 mod enums;
+mod shared;
 mod simple_enum;
 mod structs;
 mod utils;
@@ -22,7 +23,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
     let data = &ast.data;
 
     match data {
-        Data::Struct(data_struct) => struct_serializer(data_struct, name),
+        Data::Struct(data_struct) => struct_serializer(data_struct, name, ast.generics),
         Data::Enum(data_enum) => {
             let is_simple_enum = data_enum.variants.iter().all(|item| item.fields.is_empty());
             if is_simple_enum {
@@ -36,7 +37,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     }
                     None => {
                         let skip_static_size = attributes::skip_static_size(&ast.attrs);
-                        enum_serializer(data_enum, name, skip_static_size)
+                        enum_serializer(data_enum, name, skip_static_size, ast.generics)
                     }
                 }
             }
