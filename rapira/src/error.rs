@@ -34,4 +34,4 @@ pub enum RapiraError {
     OtherError(String),
 }
 
-pub type Result<T> = core::result::Result<T, RapiraError>;
+pub type Result<T, E = RapiraError> = core::result::Result<T, E>;

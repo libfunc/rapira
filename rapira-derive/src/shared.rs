@@ -50,10 +50,5 @@ pub fn build_ident(name: &Ident, mut generics: Generics) -> TokenStream {
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    println!(
-        "{}",
-        quote!(impl #impl_generics rapira::Rapira for #name #ty_generics #where_clause)
-    );
-
     quote! { impl #impl_generics rapira::Rapira for #name #ty_generics #where_clause }
 }

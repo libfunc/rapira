@@ -4,11 +4,11 @@ use zerocopy::{byteorder::U64, AsBytes, FromBytes};
 
 #[test]
 fn test_bool() {
-    let bytes = true.serialize();
+    let bytes = serialize(&true);
     assert_eq!(bytes.len(), 1);
-    let val = bool::deserialize(&bytes).unwrap();
+    let val = deserialize::<bool>(&bytes).unwrap();
     assert!(val);
-    let val = unsafe { bool::deser_unsafe(&bytes).unwrap() };
+    let val = unsafe { deser_unsafe::<bool>(&bytes).unwrap() };
     assert!(val);
 }
 
@@ -30,8 +30,8 @@ fn test_vec_fields() -> Result<()> {
         byte: 4,
     };
 
-    let vec = item.serialize();
-    assert!(item == StructVecFields::deserialize(&vec)?);
+    let vec = serialize(&item);
+    assert!(item == deserialize::<StructVecFields>(&vec)?);
     Ok(())
 }
 
@@ -52,8 +52,8 @@ fn test_unnamed_fields() -> Result<()> {
         4,
     );
 
-    let vec = item.serialize();
-    assert!(item == UnnamedFields::deserialize(&vec)?);
+    let vec = serialize(&item);
+    assert!(item == deserialize::<UnnamedFields>(&vec)?);
     Ok(())
 }
 
@@ -83,8 +83,8 @@ fn test_zero() -> Result<()> {
         zero,
         other: String::from("asdasdas"),
     };
-    let vec = item.serialize();
-    assert!(item == ZeroOwned::deserialize(&vec)?);
+    let vec = serialize(&item);
+    assert!(item == deserialize::<ZeroOwned>(&vec)?);
     Ok(())
 }
 
@@ -119,12 +119,12 @@ fn test_enum() -> Result<()> {
         c: 5,
     };
     let a = FullEnum::A("adasd".to_owned());
-    let vec = a.serialize();
-    assert!(a == FullEnum::deserialize(&vec)?);
+    let vec = serialize(&a);
+    assert!(a == deserialize::<FullEnum>(&vec)?);
 
     let b = FullEnum::B(12, 12312312321123, zero);
-    let vec = b.serialize();
-    assert!(b == FullEnum::deserialize(&vec)?);
+    let vec = serialize(&b);
+    assert!(b == deserialize::<FullEnum>(&vec)?);
 
     let c = FullEnum::C {
         c1: true,
@@ -132,16 +132,16 @@ fn test_enum() -> Result<()> {
         c3: 7,
         c4: zero,
     };
-    let vec = c.serialize();
-    assert!(c == FullEnum::deserialize(&vec)?);
+    let vec = serialize(&c);
+    assert!(c == deserialize::<FullEnum>(&vec)?);
 
     let d = FullEnum::D;
-    let vec = d.serialize();
-    assert!(d == FullEnum::deserialize(&vec)?);
+    let vec = serialize(&d);
+    assert!(d == deserialize::<FullEnum>(&vec)?);
 
     let e = NonStaticSized::B(Box::new(NonStaticSized::A(String::from("asd"))));
-    let vec = e.serialize();
-    assert!(e == NonStaticSized::deserialize(&vec)?);
+    let vec = serialize(&e);
+    assert!(e == deserialize::<NonStaticSized>(&vec)?);
 
     Ok(())
 }

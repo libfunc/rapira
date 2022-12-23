@@ -28,20 +28,20 @@ fn test_generics() -> Result<()> {
         d: true,
         e: [312; 4],
     };
-    let vec = with_generics.serialize();
-    assert!(with_generics == StructWithGeneric::<Vec<u16>, 4>::deserialize(&vec)?);
+    let vec = serialize(&with_generics);
+    assert!(with_generics == deserialize::<StructWithGeneric<Vec<u16>, 4>>(&vec)?);
 
     let a = EnumWithGeneric::<Vec<u16>>::A(vec![1, 2, 3, 4]);
-    let vec = a.serialize();
-    assert!(a == EnumWithGeneric::<Vec<u16>>::deserialize(&vec)?);
+    let vec = serialize(&a);
+    assert!(a == deserialize::<EnumWithGeneric<Vec<u16>>>(&vec)?);
 
     let b = EnumWithGeneric::<Vec<u16>>::B(12);
-    let vec = b.serialize();
-    assert!(b == EnumWithGeneric::<Vec<u16>>::deserialize(&vec)?);
+    let vec = serialize(&b);
+    assert!(b == deserialize::<EnumWithGeneric<Vec<u16>>>(&vec)?);
 
     let c = EnumWithGeneric::<Vec<u16>>::C;
-    let vec = c.serialize();
-    assert!(c == EnumWithGeneric::<Vec<u16>>::deserialize(&vec)?);
+    let vec = serialize(&c);
+    assert!(c == deserialize::<EnumWithGeneric<Vec<u16>>>(&vec)?);
 
     Ok(())
 }
