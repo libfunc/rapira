@@ -1,7 +1,7 @@
 [package]
 name = "rapira"
 description = "serialization library like borsh, bincode and speedy"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Rail Khusnutdinov <rail@33.run>"]
 keywords = ["serialization"]
 categories = []

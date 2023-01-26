@@ -2,13 +2,14 @@
 
 mod allocated;
 pub mod error;
+pub mod funcs;
 mod primitive;
 
 pub use error::{RapiraError, Result};
 pub use primitive::{byte_rapira, get_u32_unsafe};
 
 #[cfg(feature = "std")]
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv6Addr, SocketAddrV6};
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -25,6 +26,9 @@ use rust_decimal::Decimal;
 #[cfg(feature = "smallvec")]
 use smallvec::SmallVec;
 
+pub use funcs::{
+    check_bytes, deser_unchecked, deser_unsafe, deserialize, extend_vec, serialize, size,
+};
 pub use rapira_derive::Rapira;
 use simdutf8::basic::from_utf8;
 
@@ -37,56 +41,10 @@ use core::hash::BuildHasherDefault;
 #[cfg(feature = "json")]
 use serde_json::{Map, Number, Value};
 
-#[cfg(feature = "alloc")]
-pub fn serialize<T: Rapira>(item: &T) -> Vec<u8> {
-    let value_size = match T::STATIC_SIZE {
-        Some(s) => s,
-        None => item.size(),
-    };
-    let mut bytes: Vec<u8> = vec![0u8; value_size];
-    let mut cursor = 0usize;
-    item.convert_to_bytes(&mut bytes, &mut cursor);
-    bytes
-}
-
-pub fn check_bytes<T: Rapira>(bytes: &[u8]) -> Result<()>
-where
-    T: Sized,
-{
-    let mut bytes = bytes;
-    T::check_bytes(&mut bytes)
-}
-
-/// call only for safe data, not external data
-pub fn deserialize<T: Rapira>(bytes: &[u8]) -> Result<T>
-where
-    T: Sized,
-{
-    let mut bytes = bytes;
-    T::from_slice(&mut bytes)
-}
-
-pub fn deser_unchecked<T: Rapira>(bytes: &[u8]) -> Result<T>
-where
-    T: Sized,
-{
-    let mut bytes = bytes;
-    T::from_slice_unchecked(&mut bytes)
-}
-
-/// # Safety
-///
-/// This is unsafe
-pub unsafe fn deser_unsafe<T: Rapira>(bytes: &[u8]) -> Result<T>
-where
-    T: Sized,
-{
-    let mut bytes = bytes;
-    T::from_slice_unsafe(&mut bytes)
-}
-
 pub trait Rapira {
     const STATIC_SIZE: Option<usize> = None;
+
+    fn size(&self) -> usize;
 
     /// check bytes, collections len, check utf-8, NonZero, f32 and others...
     fn check_bytes(slice: &mut &[u8]) -> Result<()>;
@@ -121,12 +79,19 @@ pub trait Rapira {
     }
 
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize);
-
-    fn size(&self) -> usize;
 }
 
 impl<const CAP: usize> Rapira for [u8; CAP] {
     const STATIC_SIZE: Option<usize> = Some(CAP);
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        *slice = slice.get(CAP..).ok_or(RapiraError::SliceLenError)?;
+        Ok(())
+    }
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -141,15 +106,6 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
 
         *slice = unsafe { slice.get_unchecked(CAP..) };
         Ok(bytes)
-    }
-
-    #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<()>
-    where
-        Self: Sized,
-    {
-        *slice = slice.get(CAP..).ok_or(RapiraError::SliceLenError)?;
-        Ok(())
     }
 
     #[inline]
@@ -1029,7 +985,7 @@ impl Rapira for IpAddr {
             let v4 = <[u8; 4]>::from_slice(slice)?;
             Ok(IpAddr::from(v4))
         } else {
-            let v6 = <[u8; 16]>::from_slice(slice)?;
+            let v6 = Ipv6Addr::from_slice(slice)?;
             Ok(IpAddr::from(v6))
         }
     }
@@ -1044,7 +1000,7 @@ impl Rapira for IpAddr {
         if b == 0 {
             <[u8; 4]>::check_bytes(slice)?;
         } else {
-            <[u8; 16]>::check_bytes(slice)?;
+            Ipv6Addr::check_bytes(slice)?;
         }
 
         Ok(())
@@ -1060,7 +1016,7 @@ impl Rapira for IpAddr {
             let v4 = <[u8; 4]>::from_slice_unsafe(slice)?;
             Ok(IpAddr::from(v4))
         } else {
-            let v6 = <[u8; 16]>::from_slice_unsafe(slice)?;
+            let v6 = Ipv6Addr::from_slice_unsafe(slice)?;
             Ok(IpAddr::from(v6))
         }
     }
@@ -1074,7 +1030,7 @@ impl Rapira for IpAddr {
             }
             IpAddr::V6(v6) => {
                 push(slice, cursor, 1);
-                v6.octets().convert_to_bytes(slice, cursor);
+                v6.convert_to_bytes(slice, cursor);
             }
         }
     }
@@ -1085,6 +1041,96 @@ impl Rapira for IpAddr {
             IpAddr::V4(_) => 4,
             IpAddr::V6(_) => 16,
         }
+    }
+}
+
+#[cfg(feature = "std")]
+impl Rapira for Ipv6Addr {
+    const STATIC_SIZE: Option<usize> = Some(16);
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let v6 = <[u8; 16]>::from_slice(slice)?;
+        Ok(Ipv6Addr::from(v6))
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        <[u8; 16]>::check_bytes(slice)?;
+
+        Ok(())
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let v6 = <[u8; 16]>::from_slice_unsafe(slice)?;
+        Ok(Ipv6Addr::from(v6))
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.octets().convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        16
+    }
+}
+
+#[cfg(feature = "std")]
+impl Rapira for SocketAddrV6 {
+    const STATIC_SIZE: Option<usize> = Some(16 + 2);
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let ip = Ipv6Addr::from_slice(slice)?;
+        let port = u16::from_slice(slice)?;
+        Ok(SocketAddrV6::new(ip, port, 0, 0))
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        Ipv6Addr::check_bytes(slice)?;
+        u16::check_bytes(slice)?;
+
+        Ok(())
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let ip = Ipv6Addr::from_slice_unsafe(slice)?;
+        let port = u16::from_slice_unsafe(slice)?;
+        Ok(SocketAddrV6::new(ip, port, 0, 0))
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.ip().convert_to_bytes(slice, cursor);
+        self.port().convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        16 + 2
     }
 }
 
