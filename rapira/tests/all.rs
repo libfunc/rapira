@@ -1,3 +1,4 @@
+#![allow(clippy::extra_unused_type_parameters)]
 use byteorder::LE;
 use rapira::*;
 use zerocopy::{byteorder::U64, AsBytes, FromBytes};

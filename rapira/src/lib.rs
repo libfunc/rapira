@@ -1,12 +1,15 @@
+// #![feature(trace_macros)]
+// #![feature(log_syntax)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod allocated;
 pub mod error;
 pub mod funcs;
+mod macros;
 mod primitive;
 
 pub use error::{RapiraError, Result};
-pub use primitive::{byte_rapira, get_u32_unsafe};
+pub use primitive::{byte_rapira, get_u32_unsafe, str_rapira};
 
 #[cfg(feature = "std")]
 use std::net::{IpAddr, Ipv6Addr, SocketAddrV6};
@@ -510,9 +513,6 @@ pub fn extend(slice: &mut [u8], cursor: &mut usize, items: &[u8]) {
     let s = unsafe { slice.get_unchecked_mut(*cursor..end) };
     s.copy_from_slice(items);
     *cursor = end;
-    // unsafe {
-    //     *slice = slice.get_unchecked_mut(items.len()..);
-    // };
 }
 
 impl<T: Rapira> Rapira for Option<T> {
