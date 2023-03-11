@@ -16,6 +16,12 @@ use simple_enum::simple_enum_serializer;
 use structs::struct_serializer;
 use syn::{parse_macro_input, Data, DeriveInput};
 
+/// available attributes:
+/// #[rapira(static_size = "...")]
+/// #[rapira(primitive)] - set primitive enum for complex enum
+/// #[rapira(idx(1))]
+/// #[rapira(with = "...")]
+/// #[rapira(skip)]
 #[proc_macro_derive(Rapira, attributes(rapira))]
 pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(stream as DeriveInput);

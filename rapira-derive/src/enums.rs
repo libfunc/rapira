@@ -92,7 +92,7 @@ pub fn enum_serializer(
 
                 for (idx, field) in fields.iter().enumerate() {
                     let typ = &field.ty;
-                    let field_name = syn::Ident::new(&format!("arg{}", idx), Span::call_site());
+                    let field_name = syn::Ident::new(&format!("arg{idx}"), Span::call_site());
                     let with_attr = extract_with_attr(&field.attrs);
 
                     field_names.push(quote! { #field_name, });

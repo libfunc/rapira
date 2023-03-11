@@ -138,7 +138,7 @@ pub fn enum_with_primitive_serializer(
 
                     for (idx, field) in unnamed.iter().enumerate() {
                         let typ = &field.ty;
-                        let field_name = syn::Ident::new(&format!("arg{}", idx), Span::call_site());
+                        let field_name = syn::Ident::new(&format!("arg{idx}"), Span::call_site());
 
                         unnamed_from_slice.push(quote! {
                             let #field_name = <#typ>::from_slice(slice)?;

@@ -1,4 +1,4 @@
-use syn::{Attribute, ExprPath, Lit, Meta, MetaList, MetaNameValue, NestedMeta};
+use syn::{Attribute, ExprPath, Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 
 pub fn extract_with_attr(attrs: &[Attribute]) -> Option<ExprPath> {
     attrs.iter().find_map(|attr| {
@@ -62,5 +62,30 @@ pub fn extract_idx_attr(attrs: &[Attribute]) -> Option<u32> {
                 Err(_) => None,
             }
         })
+    })
+}
+
+pub fn skip_attr(attrs: &[Attribute]) -> bool {
+    attrs.iter().any(|attr| {
+        attr.path
+            .segments
+            .first()
+            .map(|segment| {
+                if segment.ident != "rapira" {
+                    return false;
+                }
+
+                match attr.parse_meta() {
+                    Ok(Meta::List(list)) => list.nested.iter().any(|nested| match nested {
+                        NestedMeta::Meta(Meta::Path(Path { segments, .. })) => {
+                            segments.iter().any(|segment| segment.ident == "skip")
+                        }
+                        _ => false,
+                    }),
+                    Ok(_) => false,
+                    Err(_) => false,
+                }
+            })
+            .unwrap_or(false)
     })
 }

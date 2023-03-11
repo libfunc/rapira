@@ -8,7 +8,7 @@ use syn::{DataStruct, ExprPath, Field, Fields, Generics, LitInt};
 
 use crate::{
     shared::build_ident,
-    utils::{extract_idx_attr, extract_with_attr},
+    utils::{extract_idx_attr, extract_with_attr, skip_attr},
 };
 
 pub fn struct_serializer(
@@ -26,7 +26,9 @@ pub fn struct_serializer(
                 Vec::with_capacity(named_len);
             let mut seq = 0u32;
 
-            for field in named.iter() {
+            let iter = named.iter().filter(|field| !skip_attr(&field.attrs));
+
+            for field in iter {
                 let field_idx = extract_idx_attr(&field.attrs).unwrap_or_else(|| {
                     let current_seq = seq;
                     seq += 1;
@@ -197,7 +199,7 @@ pub fn struct_serializer(
             for (idx, field) in unnamed.iter().enumerate() {
                 let id = syn::Lit::Int(LitInt::new(&idx.to_string(), Span::call_site()));
                 let typ = &field.ty;
-                let field_name = syn::Ident::new(&format!("arg{}", idx), Span::call_site());
+                let field_name = syn::Ident::new(&format!("arg{idx}"), Span::call_site());
                 let field_name_into = quote! { #field_name, };
                 let with_attr = extract_with_attr(&field.attrs);
 
