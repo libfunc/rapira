@@ -37,29 +37,26 @@ where
 /// call only for safe data, not external data
 /// not check oversize vec, string and other items with capacity and len
 /// but check utf-8 strings, float numbers, non zero numbers and others...
-pub fn deserialize<T: Rapira>(bytes: &[u8]) -> Result<T>
+pub fn deserialize<T: Rapira>(mut bytes: &[u8]) -> Result<T>
 where
     T: Sized,
 {
-    let mut bytes = bytes;
     T::from_slice(&mut bytes)
 }
 
-pub fn deser_unchecked<T: Rapira>(bytes: &[u8]) -> Result<T>
+pub fn deser_unchecked<T: Rapira>(mut bytes: &[u8]) -> Result<T>
 where
     T: Sized,
 {
-    let mut bytes = bytes;
     T::from_slice_unchecked(&mut bytes)
 }
 
 /// # Safety
 ///
 /// This is unsafe
-pub unsafe fn deser_unsafe<T: Rapira>(bytes: &[u8]) -> Result<T>
+pub unsafe fn deser_unsafe<T: Rapira>(mut bytes: &[u8]) -> Result<T>
 where
     T: Sized,
 {
-    let mut bytes = bytes;
     T::from_slice_unsafe(&mut bytes)
 }
