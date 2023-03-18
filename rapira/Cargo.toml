@@ -56,10 +56,7 @@ smallvec = { version = "1.8", optional = true, features = [
 ] }
 rust_decimal = { version = "1.27", optional = true }
 time = { version = "0.3", default-features = false }
-compact_str = { version = "0.7", optional = true, features = [
-    "bytes",
-    "serde",
-] }
+compact_str = { version = "0.7", optional = true }
 bytes = { version = "1.4", optional = true }
 
 [target.'cfg(not(target_env = "aarch64-apple-darwin"))'.dependencies]

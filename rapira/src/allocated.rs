@@ -1,8 +1,9 @@
-use crate::{extend, get_u32_unsafe, Rapira, RapiraError, Result};
+use crate::{
+    max_cap::MaxCapacity, primitive::bytes_rapira, str_rapira, Rapira, RapiraError, Result,
+};
 use alloc::borrow::Cow;
 #[cfg(feature = "bytes")]
 use bytes::Bytes;
-use simdutf8::basic::from_utf8;
 
 #[cfg(feature = "alloc")]
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
@@ -11,7 +12,7 @@ use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 impl Rapira for String {
     #[inline]
     fn size(&self) -> usize {
-        4 + self.len()
+        str_rapira::size(self)
     }
 
     #[inline]
@@ -19,17 +20,7 @@ impl Rapira for String {
     where
         Self: Sized,
     {
-        let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
-
-        if len > 10 {
-            from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
-        } else {
-            core::str::from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
-        };
-
-        *slice = unsafe { slice.get_unchecked(len..) };
-        Ok(())
+        str_rapira::check_bytes::<()>(slice)
     }
 
     #[inline]
@@ -37,17 +28,8 @@ impl Rapira for String {
     where
         Self: Sized,
     {
-        let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
-        let s = if len > 10 {
-            from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?
-        } else {
-            core::str::from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?
-        };
-
-        let s = s.to_string();
-
-        *slice = unsafe { slice.get_unchecked(len..) };
+        let s = str_rapira::from_slice(slice)?;
+        let s = s.to_owned();
         Ok(s)
     }
 
@@ -56,15 +38,8 @@ impl Rapira for String {
     where
         Self: Sized,
     {
-        let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
-        let s = unsafe {
-            let s = core::str::from_utf8_unchecked(bytes);
-            s.to_string()
-        };
-
-        *slice = unsafe { slice.get_unchecked(len..) };
-        Ok(s)
+        let s = str_rapira::from_slice_unchecked(slice)?;
+        Ok(s.to_owned())
     }
 
     #[inline]
@@ -72,44 +47,26 @@ impl Rapira for String {
     where
         Self: Sized,
     {
-        let len = get_u32_unsafe(slice) as usize;
-        let bytes = slice.get_unchecked(..len);
-
-        let s = core::str::from_utf8_unchecked(bytes);
-        let s = s.to_string();
-
-        *slice = slice.get_unchecked(len..);
-        Ok(s)
+        let s = str_rapira::from_slice_unsafe(slice)?;
+        Ok(s.to_owned())
     }
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        let len = self.len() as u32;
-        len.convert_to_bytes(slice, cursor);
-        extend(slice, cursor, self.as_bytes());
+        str_rapira::convert_to_bytes(self, slice, cursor);
     }
 
     #[inline]
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
-        let len = self.len() as u32;
-        len.try_convert_to_bytes(slice, cursor)?;
-        extend(slice, cursor, self.as_bytes());
-        Ok(())
+        str_rapira::try_convert_to_bytes(self, slice, cursor)
     }
 }
 
 #[cfg(feature = "alloc")]
 impl Rapira for Vec<u8> {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
-
-        *slice = unsafe { slice.get_unchecked(len..) };
-        Ok(bytes.to_vec())
+    fn size(&self) -> usize {
+        bytes_rapira::size(self)
     }
 
     #[inline]
@@ -117,10 +74,18 @@ impl Rapira for Vec<u8> {
     where
         Self: Sized,
     {
-        let len = u32::from_slice(slice)? as usize;
+        bytes_rapira::check_bytes::<()>(slice)
+    }
 
-        *slice = slice.get(len..).ok_or(RapiraError::SliceLenError)?;
-        Ok(())
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let bytes = bytes_rapira::from_slice(slice)?;
+        let mut v = vec![0u8; bytes.len()];
+        v.copy_from_slice(bytes);
+        Ok(v)
     }
 
     #[inline]
@@ -128,42 +93,30 @@ impl Rapira for Vec<u8> {
     where
         Self: Sized,
     {
-        let len = get_u32_unsafe(slice) as usize;
-        let bytes = slice.get_unchecked(..len);
-
-        *slice = slice.get_unchecked(len..);
-        Ok(bytes.to_vec())
+        let bytes = bytes_rapira::from_slice_unsafe(slice)?;
+        let mut v = vec![0u8; bytes.len()];
+        v.copy_from_slice(bytes);
+        Ok(v)
     }
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        let len = self.len() as u32;
-        len.convert_to_bytes(slice, cursor);
-        extend(slice, cursor, self);
+        bytes_rapira::convert_to_bytes(self, slice, cursor);
     }
 
-    #[inline]
-    fn size(&self) -> usize {
-        4 + self.len()
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        bytes_rapira::try_convert_to_bytes(self, slice, cursor)
     }
 }
 
 #[cfg(feature = "alloc")]
 impl<T: Rapira> Rapira for Vec<T> {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let len = u32::from_slice(slice)? as usize;
-        let mut vec: Vec<T> = Vec::with_capacity(len);
-
-        for _ in 0..len {
-            let val = T::from_slice(slice)?;
-            vec.push(val);
+    fn size(&self) -> usize {
+        match T::STATIC_SIZE {
+            Some(size) => 4 + (size * self.len()),
+            None => 4 + self.iter().fold(0, |b, v| b + v.size()),
         }
-
-        Ok(vec)
     }
 
     #[inline]
@@ -178,6 +131,33 @@ impl<T: Rapira> Rapira for Vec<T> {
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+
+        if len > <Vec<T> as MaxCapacity>::MAX_CAP {
+            return Err(RapiraError::MaxCapacity);
+        }
+
+        let size = std::mem::size_of::<Vec<T>>() * len;
+
+        if size > <Vec<T> as MaxCapacity>::MAX_SIZE_OF {
+            return Err(RapiraError::MaxSize);
+        }
+
+        let mut vec: Vec<T> = Vec::with_capacity(len);
+
+        for _ in 0..len {
+            let val = T::from_slice(slice)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
     }
 
     #[inline]
@@ -201,7 +181,7 @@ impl<T: Rapira> Rapira for Vec<T> {
     where
         Self: Sized,
     {
-        let len = get_u32_unsafe(slice) as usize;
+        let len = usize::from_slice_unchecked(slice)?;
         let mut vec: Vec<T> = Vec::with_capacity(len);
 
         for _ in 0..len {
@@ -231,14 +211,6 @@ impl<T: Rapira> Rapira for Vec<T> {
 
         for val in self.iter() {
             val.convert_to_bytes(slice, cursor);
-        }
-    }
-
-    #[inline]
-    fn size(&self) -> usize {
-        match T::STATIC_SIZE {
-            Some(size) => 4 + (size * self.len()),
-            None => 4 + self.iter().fold(0, |b, v| b + v.size()),
         }
     }
 }
@@ -304,15 +276,18 @@ where
     K: Ord,
 {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self> {
-        let len = u32::from_slice(slice)? as usize;
-        let mut map = BTreeMap::<K, V>::new();
-        for _ in 0..len {
-            let key = K::from_slice(slice)?;
-            let value = V::from_slice(slice)?;
-            map.insert(key, value);
+    fn size(&self) -> usize {
+        if let Some(k) = K::STATIC_SIZE {
+            if let Some(v) = V::STATIC_SIZE {
+                4 + (self.len() * (k + v))
+            } else {
+                4 + (k * self.len()) + self.iter().fold(0, |b, (_, v)| b + v.size())
+            }
+        } else {
+            4 + self.iter().fold(0, |b, (k, v)| {
+                b + k.size() + V::STATIC_SIZE.unwrap_or_else(|| v.size())
+            })
         }
-        Ok(map)
     }
 
     #[inline]
@@ -328,6 +303,18 @@ where
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self> {
+        let len = u32::from_slice(slice)? as usize;
+        let mut map = BTreeMap::<K, V>::new();
+        for _ in 0..len {
+            let key = K::from_slice(slice)?;
+            let value = V::from_slice(slice)?;
+            map.insert(key, value);
+        }
+        Ok(map)
     }
 
     #[inline]
@@ -347,7 +334,7 @@ where
     where
         Self: Sized,
     {
-        let len = get_u32_unsafe(slice) as usize;
+        let len = usize::from_slice_unchecked(slice)?;
         let mut map = BTreeMap::<K, V>::new();
         for _ in 0..len {
             let key = K::from_slice_unsafe(slice)?;
@@ -377,28 +364,13 @@ where
             value.convert_to_bytes(slice, cursor);
         }
     }
-
-    #[inline]
-    fn size(&self) -> usize {
-        if let Some(k) = K::STATIC_SIZE {
-            if let Some(v) = V::STATIC_SIZE {
-                4 + (self.len() * (k + v))
-            } else {
-                4 + (k * self.len()) + self.iter().fold(0, |b, (_, v)| b + v.size())
-            }
-        } else {
-            4 + self.iter().fold(0, |b, (k, v)| {
-                b + k.size() + V::STATIC_SIZE.unwrap_or_else(|| v.size())
-            })
-        }
-    }
 }
 
 #[cfg(feature = "alloc")]
 impl<'a> Rapira for Cow<'a, str> {
     #[inline]
     fn size(&self) -> usize {
-        4 + self.len()
+        str_rapira::size(self)
     }
 
     #[inline]
@@ -406,17 +378,7 @@ impl<'a> Rapira for Cow<'a, str> {
     where
         Self: Sized,
     {
-        let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
-
-        if len > 10 {
-            from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
-        } else {
-            core::str::from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
-        };
-
-        *slice = unsafe { slice.get_unchecked(len..) };
-        Ok(())
+        str_rapira::check_bytes::<()>(slice)
     }
 
     #[inline]
@@ -424,17 +386,8 @@ impl<'a> Rapira for Cow<'a, str> {
     where
         Self: Sized,
     {
-        let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
-        let s = if len > 10 {
-            from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?
-        } else {
-            core::str::from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?
-        };
-
+        let s = str_rapira::from_slice(slice)?;
         let s = Cow::Owned(s.to_owned());
-
-        *slice = unsafe { slice.get_unchecked(len..) };
         Ok(s)
     }
 
@@ -443,12 +396,8 @@ impl<'a> Rapira for Cow<'a, str> {
     where
         Self: Sized,
     {
-        let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
-        let s = unsafe { core::str::from_utf8_unchecked(bytes) };
+        let s = str_rapira::from_slice_unchecked(slice)?;
         let s = Cow::Owned(s.to_owned());
-
-        *slice = unsafe { slice.get_unchecked(len..) };
         Ok(s)
     }
 
@@ -457,29 +406,19 @@ impl<'a> Rapira for Cow<'a, str> {
     where
         Self: Sized,
     {
-        let len = get_u32_unsafe(slice) as usize;
-        let bytes = slice.get_unchecked(..len);
-
-        let s = core::str::from_utf8_unchecked(bytes);
+        let s = str_rapira::from_slice_unsafe(slice)?;
         let s = Cow::Owned(s.to_owned());
-
-        *slice = slice.get_unchecked(len..);
         Ok(s)
     }
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        let len = self.len() as u32;
-        len.convert_to_bytes(slice, cursor);
-        extend(slice, cursor, self.as_bytes());
+        str_rapira::convert_to_bytes(self, slice, cursor);
     }
 
     #[inline]
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
-        let len = self.len() as u32;
-        len.try_convert_to_bytes(slice, cursor)?;
-        extend(slice, cursor, self.as_bytes());
-        Ok(())
+        str_rapira::try_convert_to_bytes(self, slice, cursor)
     }
 }
 
@@ -487,19 +426,17 @@ impl<'a> Rapira for Cow<'a, str> {
 impl Rapira for Bytes {
     #[inline]
     fn size(&self) -> usize {
-        4 + self.len()
+        bytes_rapira::size(self)
     }
 
     #[inline]
     fn check_bytes(slice: &mut &[u8]) -> Result<()> {
-        <Vec<u8>>::check_bytes(slice)
+        bytes_rapira::check_bytes::<()>(slice)
     }
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        let len = self.len() as u32;
-        len.convert_to_bytes(slice, cursor);
-        extend(slice, cursor, self);
+        bytes_rapira::convert_to_bytes(self, slice, cursor);
     }
 
     #[inline]
@@ -507,10 +444,7 @@ impl Rapira for Bytes {
     where
         Self: Sized,
     {
-        let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
-
-        *slice = unsafe { slice.get_unchecked(len..) };
+        let bytes = bytes_rapira::from_slice(slice)?;
         Ok(Bytes::copy_from_slice(bytes))
     }
 
@@ -519,10 +453,7 @@ impl Rapira for Bytes {
     where
         Self: Sized,
     {
-        let len = get_u32_unsafe(slice) as usize;
-        let bytes = slice.get_unchecked(..len);
-
-        *slice = slice.get_unchecked(len..);
+        let bytes = bytes_rapira::from_slice_unsafe(slice)?;
         Ok(Bytes::copy_from_slice(bytes))
     }
 }

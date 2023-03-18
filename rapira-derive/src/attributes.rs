@@ -29,7 +29,7 @@ pub fn get_primitive_name(attrs: &[Attribute]) -> Option<TokenStream> {
     })
 }
 
-pub fn skip_static_size(attrs: &[Attribute]) -> Option<Expr> {
+pub fn enum_static_size(attrs: &[Attribute]) -> Option<Expr> {
     attrs.iter().find_map(|attr| {
         attr.path.segments.first().and_then(|segment| {
             if segment.ident != "rapira" {

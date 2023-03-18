@@ -42,8 +42,8 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                         enum_with_primitive_serializer(data_enum, name, &primitive_name)
                     }
                     None => {
-                        let skip_static_size = attributes::skip_static_size(&ast.attrs);
-                        enum_serializer(data_enum, name, skip_static_size, ast.generics)
+                        let enum_static_size = attributes::enum_static_size(&ast.attrs);
+                        enum_serializer(data_enum, name, enum_static_size, ast.generics)
                     }
                 }
             }

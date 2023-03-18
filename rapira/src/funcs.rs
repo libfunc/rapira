@@ -25,7 +25,10 @@ pub fn extend_vec<T: Rapira>(item: &T, bytes: &mut Vec<u8>) {
     item.convert_to_bytes(bytes, &mut cursor);
 }
 
-/// for unsafe data
+/// Check oversize vec and other items with capacity initialization
+/// (max memory limit attack...)
+/// check cursor oveflow,
+/// check utf-8 strings, float numbers, non zero numbers and others...
 pub fn check_bytes<T: Rapira>(bytes: &[u8]) -> Result<()>
 where
     T: Sized,
@@ -34,9 +37,12 @@ where
     T::check_bytes(&mut bytes)
 }
 
-/// call only for safe data, not external data
-/// not check oversize vec, string and other items with capacity and len
-/// but check utf-8 strings, float numbers, non zero numbers and others...
+/// Check oversize vec and other items with capacity initialization
+/// with MaxCapacity trait
+/// (max memory limit attack...)
+///
+/// but check cursor oveflow,
+/// and check utf-8 strings, float numbers, non zero numbers and others...
 pub fn deserialize<T: Rapira>(mut bytes: &[u8]) -> Result<T>
 where
     T: Sized,
@@ -44,6 +50,12 @@ where
     T::from_slice(&mut bytes)
 }
 
+/// NOT check oversize vec and other items with capacity initialization
+/// (max memory limit attack...)
+/// NOT check utf-8 strings, float numbers, non zero numbers and others...
+///
+/// but check cursor oveflow
+/// Another way - data maybe not correct, but not read from other memory
 pub fn deser_unchecked<T: Rapira>(mut bytes: &[u8]) -> Result<T>
 where
     T: Sized,
@@ -53,7 +65,13 @@ where
 
 /// # Safety
 ///
-/// This is unsafe
+/// This is extremally unsafe and UB maybe...
+/// Call only after check_bytes fn!
+///
+/// NOT check oversize vec and other items with capacity initialization
+/// (max memory limit attack...)
+/// NOT check utf-8 strings, float numbers, non zero numbers and others...
+/// NOT check cursor oveflow
 pub unsafe fn deser_unsafe<T: Rapira>(mut bytes: &[u8]) -> Result<T>
 where
     T: Sized,

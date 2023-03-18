@@ -14,7 +14,7 @@ use crate::{
 pub fn enum_serializer(
     data_enum: &DataEnum,
     name: &Ident,
-    skip_static_size: Option<Expr>,
+    static_size: Option<Expr>,
     generics: Generics,
 ) -> proc_macro::TokenStream {
     let variants_len = data_enum.variants.len();
@@ -382,10 +382,10 @@ pub fn enum_serializer(
         }
     }
 
-    let static_size = match skip_static_size {
-        Some(skip_static_size) => {
+    let static_size = match static_size {
+        Some(static_size) => {
             quote! {
-                #skip_static_size
+                #static_size
             }
         }
         None => {

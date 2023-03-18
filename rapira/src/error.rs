@@ -1,8 +1,4 @@
-#[cfg(feature = "alloc")]
-extern crate alloc;
-
-#[cfg(feature = "alloc")]
-use alloc::string::String;
+use core::array::TryFromSliceError;
 
 #[cfg(feature = "std")]
 use thiserror::Error;
@@ -29,9 +25,15 @@ pub enum RapiraError {
     SliceLenError,
     #[cfg_attr(feature = "std", error("from arr not implemented"))]
     FromArrNotImplemented,
+    #[cfg_attr(feature = "std", error("max size error"))]
+    MaxSize,
+    #[cfg_attr(feature = "std", error("max capacity error"))]
+    MaxCapacity,
+    #[cfg_attr(feature = "std", error(transparent))]
+    TryFromSliceError(#[from] TryFromSliceError),
     #[cfg(feature = "std")]
     #[cfg_attr(feature = "std", error("other error: {0}"))]
-    OtherError(String),
+    OtherError(&'static str),
 }
 
 pub type Result<T, E = RapiraError> = core::result::Result<T, E>;
