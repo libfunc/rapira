@@ -1,5 +1,8 @@
-use crate::{Rapira, RapiraError, Result};
-use core::{mem::size_of, num::NonZeroU32};
+use crate::{enum_static_size, push, static_size, Rapira, RapiraError, Result};
+use core::{
+    mem::{size_of, MaybeUninit},
+    num::NonZeroU32,
+};
 
 impl Rapira for () {
     const STATIC_SIZE: Option<usize> = Some(0);
@@ -90,10 +93,11 @@ impl Rapira for bool {
 }
 
 pub mod byte_rapira {
+    use core::marker::PhantomData;
+
     use super::*;
 
-    #[allow(clippy::extra_unused_type_parameters)]
-    pub const fn static_size<T>() -> Option<usize> {
+    pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize> {
         Some(1)
     }
 
@@ -102,9 +106,8 @@ pub mod byte_rapira {
         1
     }
 
-    #[allow(clippy::extra_unused_type_parameters)]
     #[inline]
-    pub fn check_bytes<T>(slice: &mut &[u8]) -> Result<()> {
+    pub fn check_bytes<T>(_: PhantomData<T>, slice: &mut &[u8]) -> Result<()> {
         *slice = slice.get(1..).ok_or(RapiraError::SliceLenError)?;
         Ok(())
     }
@@ -289,6 +292,7 @@ impl Rapira for usize {
     }
 }
 
+/// as i64
 impl Rapira for isize {
     const STATIC_SIZE: Option<usize> = Some(size_of::<i64>());
 
@@ -667,7 +671,534 @@ impl Rapira for f64 {
 //     }
 // }
 
+impl<T: Rapira> Rapira for Option<T> {
+    const STATIC_SIZE: Option<usize> = enum_static_size(T::STATIC_SIZE);
+
+    #[inline]
+    fn size(&self) -> usize {
+        match self {
+            None => 1,
+            Some(t) => 1 + t.size(),
+        }
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let b = byte_rapira::from_slice(slice)?;
+        if b != 0 {
+            let t = T::from_slice(slice)?;
+            Ok(Some(t))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        let b = byte_rapira::from_slice(slice)?;
+        if b != 0 {
+            T::check_bytes(slice)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let b = byte_rapira::from_slice(slice)?;
+        if b != 0 {
+            let t = T::from_slice_unchecked(slice)?;
+            Ok(Some(t))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let b = byte_rapira::from_slice_unsafe(slice)?;
+        if b != 0 {
+            let t = T::from_slice_unsafe(slice)?;
+            Ok(Some(t))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        match self.as_ref() {
+            Some(s) => {
+                push(slice, cursor, 1);
+                s.try_convert_to_bytes(slice, cursor)?;
+            }
+            None => {
+                push(slice, cursor, 0);
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        match self.as_ref() {
+            Some(s) => {
+                push(slice, cursor, 1);
+                s.convert_to_bytes(slice, cursor);
+            }
+            None => {
+                push(slice, cursor, 0);
+            }
+        }
+    }
+}
+
+impl<const CAP: usize> Rapira for [u8; CAP] {
+    const STATIC_SIZE: Option<usize> = Some(CAP);
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        *slice = slice.get(CAP..).ok_or(RapiraError::SliceLenError)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let bytes: [u8; CAP] = slice
+            .get(..CAP)
+            .ok_or(RapiraError::SliceLenError)?
+            .try_into()?;
+
+        *slice = unsafe { slice.get_unchecked(CAP..) };
+        Ok(bytes)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let bytes: &[u8] = slice.get_unchecked(..CAP);
+
+        let arr: &[u8; CAP] = core::mem::transmute_copy(&bytes);
+
+        *slice = slice.get_unchecked(CAP..);
+        Ok(*arr)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let end = *cursor + CAP;
+        let s = unsafe { slice.get_unchecked_mut(*cursor..end) };
+        s.copy_from_slice(self);
+        *cursor = end;
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        let end = *cursor + CAP;
+        let s = slice
+            .get_mut(*cursor..end)
+            .ok_or(RapiraError::SliceLenError)?;
+        s.copy_from_slice(self);
+        *cursor = end;
+        Ok(())
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        CAP
+    }
+}
+
+impl<T, const CAP: usize> Rapira for [T; CAP]
+where
+    T: Rapira + Sized,
+{
+    const STATIC_SIZE: Option<usize> = static_size([T::STATIC_SIZE; CAP]);
+
+    #[inline]
+    fn size(&self) -> usize {
+        match T::STATIC_SIZE {
+            Some(size) => size * CAP,
+            None => self.iter().map(|i| i.size()).sum(),
+        }
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()> {
+        for _ in 0..CAP {
+            T::check_bytes(slice)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut arr: [MaybeUninit<T>; CAP] = unsafe { MaybeUninit::uninit().assume_init() };
+
+        for i in 0..CAP {
+            match T::from_slice(slice) {
+                Ok(val) => {
+                    arr.get_mut(i).ok_or(RapiraError::SliceLenError)?.write(val);
+                }
+                Err(err) => {
+                    if i != 0 {
+                        let s = arr.get_mut(0..i).ok_or(RapiraError::SliceLenError)?;
+
+                        for item in s {
+                            unsafe {
+                                item.assume_init_drop();
+                            }
+                        }
+                    }
+                    return Err(err);
+                }
+            }
+        }
+
+        let arr: [T; CAP] = arr.map(|i| unsafe { i.assume_init() });
+
+        Ok(arr)
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut arr: [MaybeUninit<T>; CAP] = unsafe { MaybeUninit::uninit().assume_init() };
+
+        for i in 0..CAP {
+            match T::from_slice_unchecked(slice) {
+                Ok(val) => unsafe {
+                    arr.get_unchecked_mut(i).write(val);
+                },
+                Err(err) => {
+                    if i != 0 {
+                        unsafe {
+                            for item in arr.get_unchecked_mut(0..i) {
+                                item.assume_init_drop();
+                            }
+                        }
+                    }
+                    return Err(err);
+                }
+            }
+        }
+
+        let arr: [T; CAP] = arr.map(|i| unsafe { i.assume_init() });
+
+        Ok(arr)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut arr: [MaybeUninit<T>; CAP] = MaybeUninit::uninit().assume_init();
+
+        for i in 0..CAP {
+            match T::from_slice_unsafe(slice) {
+                Ok(val) => {
+                    arr.get_unchecked_mut(i).write(val);
+                }
+                Err(err) => {
+                    if i != 0 {
+                        for item in arr.get_unchecked_mut(0..i) {
+                            item.assume_init_drop();
+                        }
+                    }
+                    return Err(err);
+                }
+            }
+        }
+
+        let arr: [T; CAP] = arr.map(|i| i.assume_init());
+
+        Ok(arr)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        for val in self.iter() {
+            val.convert_to_bytes(slice, cursor);
+        }
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        for val in self.iter() {
+            val.try_convert_to_bytes(slice, cursor)?;
+        }
+        Ok(())
+    }
+}
+
+impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
+    const STATIC_SIZE: Option<usize> = static_size([T0::STATIC_SIZE, T1::STATIC_SIZE]);
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice(slice)?;
+        let t1 = T1::from_slice(slice)?;
+        Ok((t0, t1))
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        T0::check_bytes(slice)?;
+        T1::check_bytes(slice)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice_unchecked(slice)?;
+        let t1 = T1::from_slice_unchecked(slice)?;
+        Ok((t0, t1))
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice_unsafe(slice)?;
+        let t1 = T1::from_slice_unsafe(slice)?;
+        Ok((t0, t1))
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        self.0.try_convert_to_bytes(slice, cursor)?;
+        self.1.try_convert_to_bytes(slice, cursor)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.0.convert_to_bytes(slice, cursor);
+        self.1.convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        let a = match T0::STATIC_SIZE {
+            Some(s) => s,
+            None => self.0.size(),
+        };
+        let b = match T1::STATIC_SIZE {
+            Some(s) => s,
+            None => self.1.size(),
+        };
+        a + b
+    }
+}
+
+impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
+    const STATIC_SIZE: Option<usize> =
+        static_size([T0::STATIC_SIZE, T1::STATIC_SIZE, T2::STATIC_SIZE]);
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice(slice)?;
+        let t1 = T1::from_slice(slice)?;
+        let t2 = T2::from_slice(slice)?;
+        Ok((t0, t1, t2))
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        T0::check_bytes(slice)?;
+        T1::check_bytes(slice)?;
+        T2::check_bytes(slice)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice_unchecked(slice)?;
+        let t1 = T1::from_slice_unchecked(slice)?;
+        let t2 = T2::from_slice_unchecked(slice)?;
+        Ok((t0, t1, t2))
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice_unsafe(slice)?;
+        let t1 = T1::from_slice_unsafe(slice)?;
+        let t2 = T2::from_slice_unsafe(slice)?;
+        Ok((t0, t1, t2))
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        self.0.try_convert_to_bytes(slice, cursor)?;
+        self.1.try_convert_to_bytes(slice, cursor)?;
+        self.2.try_convert_to_bytes(slice, cursor)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.0.convert_to_bytes(slice, cursor);
+        self.1.convert_to_bytes(slice, cursor);
+        self.2.convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        (match T0::STATIC_SIZE {
+            Some(s) => s,
+            None => self.0.size(),
+        }) + (match T1::STATIC_SIZE {
+            Some(s) => s,
+            None => self.1.size(),
+        }) + (match T2::STATIC_SIZE {
+            Some(s) => s,
+            None => self.2.size(),
+        })
+    }
+}
+
+impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3) {
+    const STATIC_SIZE: Option<usize> = static_size([
+        T0::STATIC_SIZE,
+        T1::STATIC_SIZE,
+        T2::STATIC_SIZE,
+        T3::STATIC_SIZE,
+    ]);
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice(slice)?;
+        let t1 = T1::from_slice(slice)?;
+        let t2 = T2::from_slice(slice)?;
+        let t3 = T3::from_slice(slice)?;
+        Ok((t0, t1, t2, t3))
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        T0::check_bytes(slice)?;
+        T1::check_bytes(slice)?;
+        T2::check_bytes(slice)?;
+        T3::check_bytes(slice)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice_unchecked(slice)?;
+        let t1 = T1::from_slice_unchecked(slice)?;
+        let t2 = T2::from_slice_unchecked(slice)?;
+        let t3 = T3::from_slice_unchecked(slice)?;
+        Ok((t0, t1, t2, t3))
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice_unsafe(slice)?;
+        let t1 = T1::from_slice_unsafe(slice)?;
+        let t2 = T2::from_slice_unsafe(slice)?;
+        let t3 = T3::from_slice_unsafe(slice)?;
+        Ok((t0, t1, t2, t3))
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        self.0.try_convert_to_bytes(slice, cursor)?;
+        self.1.try_convert_to_bytes(slice, cursor)?;
+        self.2.try_convert_to_bytes(slice, cursor)?;
+        self.3.try_convert_to_bytes(slice, cursor)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.0.convert_to_bytes(slice, cursor);
+        self.1.convert_to_bytes(slice, cursor);
+        self.2.convert_to_bytes(slice, cursor);
+        self.3.convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        (match T0::STATIC_SIZE {
+            Some(s) => s,
+            None => self.0.size(),
+        }) + (match T1::STATIC_SIZE {
+            Some(s) => s,
+            None => self.1.size(),
+        }) + (match T2::STATIC_SIZE {
+            Some(s) => s,
+            None => self.2.size(),
+        }) + (match T3::STATIC_SIZE {
+            Some(s) => s,
+            None => self.3.size(),
+        })
+    }
+}
+
 pub mod str_rapira {
+    use core::marker::PhantomData;
+
     use simdutf8::basic::from_utf8;
 
     use crate::extend;
@@ -676,8 +1207,7 @@ pub mod str_rapira {
 
     const STR_MIN_LEN_SIMD: usize = 16;
 
-    #[allow(clippy::extra_unused_type_parameters)]
-    pub const fn static_size<T>() -> Option<usize> {
+    pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize> {
         None
     }
 
@@ -686,9 +1216,8 @@ pub mod str_rapira {
         4 + s.len()
     }
 
-    #[allow(clippy::extra_unused_type_parameters)]
     #[inline]
-    pub fn check_bytes<T>(slice: &mut &[u8]) -> Result<()> {
+    pub fn check_bytes<T>(_: PhantomData<T>, slice: &mut &[u8]) -> Result<()> {
         let len = u32::from_slice(slice)? as usize;
         let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
 
@@ -764,12 +1293,13 @@ pub mod str_rapira {
 }
 
 pub mod bytes_rapira {
+    use core::marker::PhantomData;
+
     use crate::extend;
 
     use super::*;
 
-    #[allow(clippy::extra_unused_type_parameters)]
-    pub const fn static_size<T>() -> Option<usize> {
+    pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize> {
         None
     }
 
@@ -778,9 +1308,8 @@ pub mod bytes_rapira {
         4 + s.len()
     }
 
-    #[allow(clippy::extra_unused_type_parameters)]
     #[inline]
-    pub fn check_bytes<T>(slice: &mut &[u8]) -> Result<()> {
+    pub fn check_bytes<T>(_: PhantomData<T>, slice: &mut &[u8]) -> Result<()> {
         let len = u32::from_slice(slice)? as usize;
         *slice = slice.get(len..).ok_or(RapiraError::SliceLenError)?;
         Ok(())

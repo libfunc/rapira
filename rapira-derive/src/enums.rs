@@ -4,11 +4,11 @@ extern crate syn;
 
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{DataEnum, Expr, Field, Fields, Generics, Lit, Meta, NestedMeta};
+use syn::{DataEnum, Expr, Field, Fields, Generics};
 
 use crate::{
+    field_attrs::{extract_idx_attr, extract_with_attr},
     shared::build_ident,
-    utils::{extract_idx_attr, extract_with_attr},
 };
 
 pub fn enum_serializer(
@@ -100,15 +100,17 @@ pub fn enum_serializer(
                     match with_attr {
                         Some(with_attr) => {
                             fields_static_sizes.push(quote! {
-                                #with_attr::static_size::<#typ>(),
+                                #with_attr::static_size(core::marker::PhantomData::<#typ>),
                             });
+                            fields_size.push(
+                                quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
+                                    Some(s) => s,
+                                    None => #with_attr::size(#field_name)
+                                }) },
+                            );
                             fields_check_bytes.push(quote! {
-                                #with_attr::check_bytes::<#typ>(slice)?;
+                                #with_attr::check_bytes(core::marker::PhantomData::<#typ>, slice)?;
                             });
-                            fields_size.push(quote! { + (match #with_attr::static_size::<#typ>() {
-                                Some(s) => s,
-                                None => #with_attr::size(#field_name)
-                            }) });
                             fields_from_slice.push(quote! {
                                 let #field_name: #typ = #with_attr::from_slice(slice)?;
                             });
@@ -212,43 +214,12 @@ pub fn enum_serializer(
                 let mut seq = 0u32;
 
                 for field in fields.iter() {
-                    let field_idx = field
-                        .attrs
-                        .iter()
-                        .find_map(|a| {
-                            a.path.segments.first().and_then(|segment| {
-                                if segment.ident != "idx" {
-                                    return None;
-                                }
-                                match a.parse_meta() {
-                                    Ok(Meta::List(list)) => {
-                                        let a = list.nested.first().unwrap();
-                                        let int: u32 = match a {
-                                            NestedMeta::Lit(Lit::Int(i)) => {
-                                                i.base10_parse::<u32>().unwrap()
-                                            }
-                                            _ => {
-                                                panic!("error meta type")
-                                            }
-                                        };
-                                        Some(int)
-                                    }
-                                    Ok(Meta::NameValue(nv)) => match nv.lit {
-                                        Lit::Int(i) => Some(i.base10_parse::<u32>().unwrap()),
-                                        _ => {
-                                            panic!("error meta type")
-                                        }
-                                    },
-                                    Ok(_) => None,
-                                    Err(_) => None,
-                                }
-                            })
-                        })
-                        .unwrap_or_else(|| {
-                            let current_seq = seq;
-                            seq += 1;
-                            current_seq
-                        });
+                    let field_idx = extract_idx_attr(&field.attrs);
+                    let field_idx = field_idx.unwrap_or_else(|| {
+                        let current_seq = seq;
+                        seq += 1;
+                        current_seq
+                    });
 
                     fields_insert.push((field.clone(), field_idx));
                 }
@@ -275,15 +246,17 @@ pub fn enum_serializer(
                     match with_attr {
                         Some(with_attr) => {
                             fields_static_sizes.push(quote! {
-                                #with_attr::static_size::<#typ>(),
+                                #with_attr::static_size(core::marker::PhantomData::<#typ>),
                             });
+                            fields_size.push(
+                                quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
+                                    Some(s) => s,
+                                    None => #with_attr::size(#field_name)
+                                }) },
+                            );
                             fields_check_bytes.push(quote! {
-                                #with_attr::check_bytes::<#typ>(slice)?;
+                                #with_attr::check_bytes(core::marker::PhantomData::<#typ>, slice)?;
                             });
-                            fields_size.push(quote! { + (match #with_attr::static_size::<#typ>() {
-                                Some(s) => s,
-                                None => #with_attr::size(#field_name)
-                            }) });
                             fields_from_slice.push(quote! {
                                 let #field_name: #typ = #with_attr::from_slice(slice)?;
                             });

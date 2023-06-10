@@ -1,12 +1,13 @@
 use crate::{
-    max_cap::MaxCapacity, primitive::bytes_rapira, str_rapira, Rapira, RapiraError, Result,
+    byte_rapira, max_cap::MaxCapacity, primitive::bytes_rapira, push, str_rapira, Rapira,
+    RapiraError, Result,
 };
 use alloc::borrow::Cow;
-#[cfg(feature = "bytes")]
-use bytes::Bytes;
 
 #[cfg(feature = "alloc")]
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
+#[cfg(feature = "std")]
+use std::net::{IpAddr, Ipv6Addr, SocketAddrV6};
 
 #[cfg(feature = "alloc")]
 impl Rapira for String {
@@ -20,7 +21,7 @@ impl Rapira for String {
     where
         Self: Sized,
     {
-        str_rapira::check_bytes::<()>(slice)
+        str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
     }
 
     #[inline]
@@ -74,7 +75,7 @@ impl Rapira for Vec<u8> {
     where
         Self: Sized,
     {
-        bytes_rapira::check_bytes::<()>(slice)
+        bytes_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
     }
 
     #[inline]
@@ -181,7 +182,7 @@ impl<T: Rapira> Rapira for Vec<T> {
     where
         Self: Sized,
     {
-        let len = usize::from_slice_unchecked(slice)?;
+        let len = u32::from_slice_unsafe(slice)? as usize;
         let mut vec: Vec<T> = Vec::with_capacity(len);
 
         for _ in 0..len {
@@ -334,7 +335,7 @@ where
     where
         Self: Sized,
     {
-        let len = usize::from_slice_unchecked(slice)?;
+        let len = u32::from_slice_unsafe(slice)?;
         let mut map = BTreeMap::<K, V>::new();
         for _ in 0..len {
             let key = K::from_slice_unsafe(slice)?;
@@ -378,7 +379,7 @@ impl<'a> Rapira for Cow<'a, str> {
     where
         Self: Sized,
     {
-        str_rapira::check_bytes::<()>(slice)
+        str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
     }
 
     #[inline]
@@ -422,30 +423,37 @@ impl<'a> Rapira for Cow<'a, str> {
     }
 }
 
-#[cfg(feature = "bytes")]
-impl Rapira for Bytes {
-    #[inline]
-    fn size(&self) -> usize {
-        bytes_rapira::size(self)
-    }
-
-    #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> Result<()> {
-        bytes_rapira::check_bytes::<()>(slice)
-    }
-
-    #[inline]
-    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        bytes_rapira::convert_to_bytes(self, slice, cursor);
-    }
-
+#[cfg(feature = "std")]
+impl Rapira for IpAddr {
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
-        let bytes = bytes_rapira::from_slice(slice)?;
-        Ok(Bytes::copy_from_slice(bytes))
+        let b = byte_rapira::from_slice(slice)?;
+        if b == 0 {
+            let v4 = <[u8; 4]>::from_slice(slice)?;
+            Ok(IpAddr::from(v4))
+        } else {
+            let v6 = Ipv6Addr::from_slice(slice)?;
+            Ok(IpAddr::from(v6))
+        }
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        let b = byte_rapira::from_slice(slice)?;
+
+        if b == 0 {
+            <[u8; 4]>::check_bytes(slice)?;
+        } else {
+            Ipv6Addr::check_bytes(slice)?;
+        }
+
+        Ok(())
     }
 
     #[inline]
@@ -453,7 +461,125 @@ impl Rapira for Bytes {
     where
         Self: Sized,
     {
-        let bytes = bytes_rapira::from_slice_unsafe(slice)?;
-        Ok(Bytes::copy_from_slice(bytes))
+        let b = byte_rapira::from_slice_unsafe(slice)?;
+        if b == 0 {
+            let v4 = <[u8; 4]>::from_slice_unsafe(slice)?;
+            Ok(IpAddr::from(v4))
+        } else {
+            let v6 = Ipv6Addr::from_slice_unsafe(slice)?;
+            Ok(IpAddr::from(v6))
+        }
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        match self {
+            IpAddr::V4(v4) => {
+                push(slice, cursor, 0);
+                v4.octets().convert_to_bytes(slice, cursor);
+            }
+            IpAddr::V6(v6) => {
+                push(slice, cursor, 1);
+                v6.convert_to_bytes(slice, cursor);
+            }
+        }
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        1 + match self {
+            IpAddr::V4(_) => 4,
+            IpAddr::V6(_) => 16,
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl Rapira for Ipv6Addr {
+    const STATIC_SIZE: Option<usize> = Some(16);
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let v6 = <[u8; 16]>::from_slice(slice)?;
+        Ok(Ipv6Addr::from(v6))
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        <[u8; 16]>::check_bytes(slice)?;
+
+        Ok(())
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let v6 = <[u8; 16]>::from_slice_unsafe(slice)?;
+        Ok(Ipv6Addr::from(v6))
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.octets().convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        16
+    }
+}
+
+#[cfg(feature = "std")]
+impl Rapira for SocketAddrV6 {
+    const STATIC_SIZE: Option<usize> = Some(16 + 2);
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let ip = Ipv6Addr::from_slice(slice)?;
+        let port = u16::from_slice(slice)?;
+        Ok(SocketAddrV6::new(ip, port, 0, 0))
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        Ipv6Addr::check_bytes(slice)?;
+        u16::check_bytes(slice)?;
+
+        Ok(())
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let ip = Ipv6Addr::from_slice_unsafe(slice)?;
+        let port = u16::from_slice_unsafe(slice)?;
+        Ok(SocketAddrV6::new(ip, port, 0, 0))
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.ip().convert_to_bytes(slice, cursor);
+        self.port().convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        16 + 2
     }
 }

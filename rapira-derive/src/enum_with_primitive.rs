@@ -4,12 +4,14 @@ extern crate syn;
 
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{DataEnum, Field, Fields, Lit, Meta, NestedMeta};
+use syn::{DataEnum, Field, Fields};
+
+use crate::field_attrs::extract_idx_attr;
 
 pub fn enum_with_primitive_serializer(
     data_enum: &DataEnum,
     name: &Ident,
-    primitive_name: &TokenStream,
+    primitive_name: Ident,
 ) -> proc_macro::TokenStream {
     let variants_len = data_enum.variants.len();
 
@@ -226,43 +228,12 @@ pub fn enum_with_primitive_serializer(
                 let mut seq = 0u32;
 
                 for field in named.iter() {
-                    let field_idx = field
-                        .attrs
-                        .iter()
-                        .find_map(|a| {
-                            a.path.segments.first().and_then(|segment| {
-                                if segment.ident != "idx" {
-                                    return None;
-                                }
-                                match a.parse_meta() {
-                                    Ok(Meta::List(list)) => {
-                                        let a = list.nested.first().unwrap();
-                                        let int: u32 = match a {
-                                            NestedMeta::Lit(Lit::Int(i)) => {
-                                                i.base10_parse::<u32>().unwrap()
-                                            }
-                                            _ => {
-                                                panic!("error meta type")
-                                            }
-                                        };
-                                        Some(int)
-                                    }
-                                    Ok(Meta::NameValue(nv)) => match nv.lit {
-                                        Lit::Int(i) => Some(i.base10_parse::<u32>().unwrap()),
-                                        _ => {
-                                            panic!("error meta type")
-                                        }
-                                    },
-                                    Ok(_) => None,
-                                    Err(_) => None,
-                                }
-                            })
-                        })
-                        .unwrap_or_else(|| {
-                            let current_seq = seq;
-                            seq += 1;
-                            current_seq
-                        });
+                    let field_idx = extract_idx_attr(&field.attrs);
+                    let field_idx = field_idx.unwrap_or_else(|| {
+                        let current_seq = seq;
+                        seq += 1;
+                        current_seq
+                    });
 
                     fields_insert.push((field.clone(), field_idx));
                 }

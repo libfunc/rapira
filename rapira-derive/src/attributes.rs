@@ -2,61 +2,30 @@ extern crate proc_macro2;
 extern crate quote;
 extern crate syn;
 
-use proc_macro2::TokenStream;
-use quote::ToTokens;
-use syn::{Attribute, Expr, Ident, Lit, Meta, MetaNameValue, NestedMeta};
+use syn::{Attribute, Expr, Ident, MetaNameValue};
 
-pub fn get_primitive_name(attrs: &[Attribute]) -> Option<TokenStream> {
+/// `#[primitive(PrimitiveName)]` in enums
+pub fn get_primitive_name(attrs: &[Attribute]) -> Option<Ident> {
     attrs.iter().find_map(|attr| {
-        attr.path.segments.first().and_then(|segment| {
-            if segment.ident != "primitive" {
-                return None;
-            }
-            match attr.parse_meta() {
-                Ok(Meta::NameValue(name_value)) => {
-                    if let Lit::Str(litstr) = name_value.lit {
-                        let s = litstr.parse::<Ident>().unwrap();
-                        let value = s.to_token_stream();
-                        Some(value)
-                    } else {
-                        None
-                    }
-                }
-                Ok(_) => None,
-                Err(_) => None,
-            }
-        })
+        if !attr.path().is_ident("primitive") {
+            return None;
+        }
+
+        attr.parse_args().unwrap()
     })
 }
 
+/// `#[rapira(static_size = None)]` in enums
 pub fn enum_static_size(attrs: &[Attribute]) -> Option<Expr> {
     attrs.iter().find_map(|attr| {
-        attr.path.segments.first().and_then(|segment| {
-            if segment.ident != "rapira" {
-                return None;
-            }
-            match attr.parse_meta() {
-                Ok(Meta::List(list)) => list.nested.iter().find_map(|nested| match nested {
-                    NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                        path,
-                        lit: Lit::Str(lit_str),
-                        ..
-                    })) => path.segments.first().and_then(|segment| {
-                        if segment.ident != "static_size" {
-                            return None;
-                        }
-                        match lit_str.parse::<Expr>() {
-                            Ok(expr) => Some(expr),
-                            Err(_) => {
-                                panic!("invalid path");
-                            }
-                        }
-                    }),
-                    _ => None,
-                }),
-                Ok(_) => None,
-                Err(_) => None,
-            }
-        })
+        if !attr.path().is_ident("rapira") {
+            return None;
+        }
+
+        if let Ok(nv) = attr.parse_args::<MetaNameValue>() {
+            return nv.path.is_ident("static_size").then_some(nv.value);
+        }
+
+        None
     })
 }

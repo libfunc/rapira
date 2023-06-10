@@ -1,4 +1,3 @@
-#![allow(clippy::extra_unused_type_parameters)]
 use byteorder::LE;
 use rapira::*;
 use zerocopy::{byteorder::U64, AsBytes, FromBytes};
@@ -18,7 +17,7 @@ struct StructVecFields {
     vec: Vec<u8>,
     arr: [i32; 8],
     arr_bytes: [u8; 4],
-    #[rapira(with = "rapira::byte_rapira")]
+    #[rapira(with = rapira::byte_rapira)]
     byte: u8,
 }
 
@@ -41,7 +40,7 @@ struct UnnamedFields(
     Vec<u8>,
     [i32; 8],
     [u8; 4],
-    #[rapira(with = "rapira::byte_rapira")] u8,
+    #[rapira(with = rapira::byte_rapira)] u8,
 );
 
 #[test]
@@ -68,7 +67,7 @@ struct Zero {
 
 #[derive(Debug, Rapira, PartialEq)]
 struct ZeroOwned {
-    #[rapira(with = "rapira::zero")]
+    #[rapira(with = rapira::zero)]
     zero: Zero,
     other: String,
 }
@@ -92,20 +91,20 @@ fn test_zero() -> Result<()> {
 #[derive(Debug, Rapira, PartialEq)]
 enum FullEnum {
     A(String),
-    B(u16, u64, #[rapira(with = "rapira::zero")] Zero),
+    B(u16, u64, #[rapira(with = rapira::zero)] Zero),
     C {
         c1: bool,
         c2: (usize, isize),
-        #[rapira(with = "rapira::byte_rapira")]
+        #[rapira(with = rapira::byte_rapira)]
         c3: u8,
-        #[rapira(with = "rapira::zero")]
+        #[rapira(with = rapira::zero)]
         c4: Zero,
     },
     D,
 }
 
 #[derive(Debug, Rapira, PartialEq)]
-#[rapira(static_size = "None")]
+#[rapira(static_size = None)]
 enum NonStaticSized {
     A(String),
     B(Box<NonStaticSized>),
@@ -129,12 +128,15 @@ fn test_enum() -> Result<()> {
 
     let c = FullEnum::C {
         c1: true,
-        c2: (34534435354, -12312312312),
+        c2: (4_034_435_354, -12312312312),
         c3: 7,
         c4: zero,
     };
     let vec = serialize(&c);
-    assert!(c == deserialize::<FullEnum>(&vec)?);
+    println!("{c:?}");
+    let new_c = deserialize::<FullEnum>(&vec)?;
+    println!("{new_c:?}");
+    assert!(c == new_c);
 
     let d = FullEnum::D;
     let vec = serialize(&d);

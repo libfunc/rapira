@@ -7,8 +7,8 @@ use quote::quote;
 use syn::{DataStruct, ExprPath, Field, Fields, Generics, LitInt};
 
 use crate::{
+    field_attrs::{extract_idx_attr, extract_with_attr, skip_attr},
     shared::build_ident,
-    utils::{extract_idx_attr, extract_with_attr, skip_attr},
 };
 
 pub fn struct_serializer(
@@ -61,15 +61,17 @@ pub fn struct_serializer(
                 match with_attr {
                     Some(with_attr) => {
                         static_sizes.push(quote! {
-                            #with_attr::static_size::<#typ>(),
+                            #with_attr::static_size(core::marker::PhantomData::<#typ>),
                         });
+                        size.push(
+                            quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
+                                Some(s) => s,
+                                None => #with_attr::size(&self.#ident)
+                            }) },
+                        );
                         check_bytes.push(quote! {
-                            #with_attr::check_bytes::<#typ>(slice)?;
+                            #with_attr::check_bytes(core::marker::PhantomData::<#typ>, slice)?;
                         });
-                        size.push(quote! { + (match #with_attr::static_size::<#typ>() {
-                            Some(s) => s,
-                            None => #with_attr::size(&self.#ident)
-                        }) });
                         from_slice.push(quote! {
                             let #ident: #typ = #with_attr::from_slice(slice)?;
                         });
@@ -208,15 +210,17 @@ pub fn struct_serializer(
                 match with_attr {
                     Some(with_attr) => {
                         static_sizes.push(quote! {
-                            #with_attr::static_size::<#typ>(),
+                            #with_attr::static_size(core::marker::PhantomData::<#typ>),
                         });
+                        size.push(
+                            quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
+                                Some(s) => s,
+                                None => #with_attr::size(&self.#id)
+                            }) },
+                        );
                         check_bytes.push(quote! {
-                            #with_attr::check_bytes::<#typ>(slice)?;
+                            #with_attr::check_bytes(core::marker::PhantomData::<#typ>, slice)?;
                         });
-                        size.push(quote! { + (match #with_attr::static_size::<#typ>() {
-                            Some(s) => s,
-                            None => #with_attr::size(&self.#id)
-                        }) });
                         from_slice.push(quote! {
                             let #field_name: #typ = #with_attr::from_slice(slice)?;
                         });

@@ -5,10 +5,10 @@ extern crate syn;
 mod attributes;
 mod enum_with_primitive;
 mod enums;
+mod field_attrs;
 mod shared;
 mod simple_enum;
 mod structs;
-mod utils;
 
 use enum_with_primitive::enum_with_primitive_serializer;
 use enums::enum_serializer;
@@ -17,12 +17,12 @@ use structs::struct_serializer;
 use syn::{parse_macro_input, Data, DeriveInput};
 
 /// available attributes:
-/// #[rapira(static_size = "...")]
-/// #[rapira(primitive)] - set primitive enum for complex enum
-/// #[rapira(idx(1))]
-/// #[rapira(with = "...")]
-/// #[rapira(skip)]
-#[proc_macro_derive(Rapira, attributes(rapira))]
+/// - `#[primitive(PrimitiveName)]` - set primitive enum for complex enum
+/// - `#[idx = 1]`
+/// - `#[rapira(static_size = expr)]`
+/// - `#[rapira(with = path)]`
+/// - `#[rapira(skip)]`
+#[proc_macro_derive(Rapira, attributes(rapira, idx, primitive))]
 pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(stream as DeriveInput);
     let name = &ast.ident;
@@ -39,7 +39,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
 
                 match primitive_name {
                     Some(primitive_name) => {
-                        enum_with_primitive_serializer(data_enum, name, &primitive_name)
+                        enum_with_primitive_serializer(data_enum, name, primitive_name)
                     }
                     None => {
                         let enum_static_size = attributes::enum_static_size(&ast.attrs);
@@ -49,7 +49,7 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
         }
         Data::Union(_) => {
-            panic!("unions not supported, but Rust enums is implemented Rapira trait (use Enums instead)")
+            panic!("unions not supported, but Rust enums is implemented Rapira trait (use Enums instead)");
         }
     }
 }

@@ -1,3 +1,10 @@
 [workspace]
-
 members = ["rapira", "rapira-derive"]
+resolver = "2"
+
+[workspace.package]
+authors = ["Rail Khusnutdinov <rail@33.run>"]
+edition = "2021"
+
+[patch.crates-io]
+rapira-derive = { path = "./rapira-derive" }
