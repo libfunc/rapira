@@ -1,6 +1,8 @@
 use crate::{
-    byte_rapira, max_cap::MaxCapacity, primitive::bytes_rapira, push, str_rapira, Rapira,
-    RapiraError, Result,
+    byte_rapira,
+    max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF},
+    primitive::bytes_rapira,
+    push, str_rapira, Rapira, RapiraError, Result,
 };
 use alloc::borrow::Cow;
 
@@ -84,9 +86,7 @@ impl Rapira for Vec<u8> {
         Self: Sized,
     {
         let bytes = bytes_rapira::from_slice(slice)?;
-        let mut v = vec![0u8; bytes.len()];
-        v.copy_from_slice(bytes);
-        Ok(v)
+        Ok(bytes.to_vec())
     }
 
     #[inline]
@@ -95,9 +95,7 @@ impl Rapira for Vec<u8> {
         Self: Sized,
     {
         let bytes = bytes_rapira::from_slice_unsafe(slice)?;
-        let mut v = vec![0u8; bytes.len()];
-        v.copy_from_slice(bytes);
-        Ok(v)
+        Ok(bytes.to_vec())
     }
 
     #[inline]
@@ -141,13 +139,13 @@ impl<T: Rapira> Rapira for Vec<T> {
     {
         let len = u32::from_slice(slice)? as usize;
 
-        if len > <Vec<T> as MaxCapacity>::MAX_CAP {
+        if len > VEC_MAX_CAP {
             return Err(RapiraError::MaxCapacity);
         }
 
         let size = std::mem::size_of::<Vec<T>>() * len;
 
-        if size > <Vec<T> as MaxCapacity>::MAX_SIZE_OF {
+        if size > VEC_MAX_SIZE_OF {
             return Err(RapiraError::MaxSize);
         }
 

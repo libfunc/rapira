@@ -41,7 +41,7 @@ where
 /// with MaxCapacity trait
 /// (max memory limit attack...)
 ///
-/// but check cursor oveflow,
+/// Check cursor oveflow,
 /// and check utf-8 strings, float numbers, non zero numbers and others...
 pub fn deserialize<T: Rapira>(mut bytes: &[u8]) -> Result<T>
 where

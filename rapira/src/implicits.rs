@@ -20,7 +20,9 @@ use smallvec::SmallVec;
 use uuid::Uuid;
 
 use crate::{
-    byte_rapira, bytes_rapira, max_cap::MaxCapacity, push, str_rapira, Rapira, RapiraError, Result,
+    byte_rapira, bytes_rapira,
+    max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF, VEC_MAX_CAP, VEC_MAX_SIZE_OF},
+    push, str_rapira, Rapira, RapiraError, Result,
 };
 
 #[cfg(feature = "arrayvec")]
@@ -223,13 +225,13 @@ impl<T: Rapira, const CAP: usize> Rapira for SmallVec<[T; CAP]> {
     {
         let len = u32::from_slice(slice)? as usize;
 
-        if len > <SmallVec<[T; CAP]> as MaxCapacity>::MAX_CAP {
+        if len > SMALLVEC_MAX_CAP {
             return Err(RapiraError::MaxCapacity);
         }
 
         let size = std::mem::size_of::<SmallVec<[T; CAP]>>() * len;
 
-        if size > <SmallVec<[T; CAP]> as MaxCapacity>::MAX_SIZE_OF {
+        if size > SMALLVEC_MAX_SIZE_OF {
             return Err(RapiraError::MaxSize);
         }
 
@@ -776,21 +778,20 @@ where
     S: core::hash::Hasher + core::default::Default,
 {
     #[inline]
-    fn from_slice(slice: &mut &[u8]) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let len = u32::from_slice(slice)? as usize;
-        let hasher = BuildHasherDefault::<S>::default();
-        let mut map =
-            IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
-        for _ in 0..len {
-            let key = K::from_slice(slice)?;
-            let value = V::from_slice(slice)?;
-            map.insert(key, value);
+    fn size(&self) -> usize {
+        if let Some(k) = K::STATIC_SIZE {
+            if let Some(v) = V::STATIC_SIZE {
+                4 + (self.len() * (k + v))
+            } else {
+                4 + (k * self.len()) + self.iter().fold(0, |b, (_, v)| b + v.size())
+            }
+        } else {
+            4 + self.iter().fold(0, |b, (k, v)| {
+                b + k.size() + V::STATIC_SIZE.unwrap_or_else(|| v.size())
+            })
         }
-        Ok(map)
     }
+
     #[inline]
     fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
@@ -803,6 +804,35 @@ where
         }
         Ok(())
     }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+
+        if len > VEC_MAX_CAP {
+            return Err(RapiraError::MaxCapacity);
+        }
+
+        let size = std::mem::size_of::<IndexMap<K, V, BuildHasherDefault<S>>>() * len;
+
+        if size > VEC_MAX_SIZE_OF {
+            return Err(RapiraError::MaxSize);
+        }
+
+        let hasher = BuildHasherDefault::<S>::default();
+        let mut map =
+            IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
+        for _ in 0..len {
+            let key = K::from_slice(slice)?;
+            let value = V::from_slice(slice)?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+
     #[inline]
     fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
@@ -819,6 +849,7 @@ where
         }
         Ok(map)
     }
+
     #[inline]
     unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
@@ -835,6 +866,7 @@ where
         }
         Ok(map)
     }
+
     #[inline]
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         let len = self.len() as u32;
@@ -845,6 +877,7 @@ where
         }
         Ok(())
     }
+
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
         let len = self.len() as u32;
@@ -852,20 +885,6 @@ where
         for (key, value) in self {
             key.convert_to_bytes(slice, cursor);
             value.convert_to_bytes(slice, cursor);
-        }
-    }
-    #[inline]
-    fn size(&self) -> usize {
-        if let Some(k) = K::STATIC_SIZE {
-            if let Some(v) = V::STATIC_SIZE {
-                4 + (self.len() * (k + v))
-            } else {
-                4 + (k * self.len()) + self.iter().fold(0, |b, (_, v)| b + v.size())
-            }
-        } else {
-            4 + self.iter().fold(0, |b, (k, v)| {
-                b + k.size() + V::STATIC_SIZE.unwrap_or_else(|| v.size())
-            })
         }
     }
 }

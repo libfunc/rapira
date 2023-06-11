@@ -31,7 +31,7 @@ pub trait Rapira {
     fn check_bytes(slice: &mut &[u8]) -> Result<()>;
 
     /// this is safe, but not check collections capacity!
-    /// recommend use only for safe data, not external data.
+    /// recommend use only for safe data (example: from DB), not external data.
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized;
@@ -51,7 +51,10 @@ pub trait Rapira {
     /// This is unsafe, but maybe safe after check_bytes fn
     unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
     where
-        Self: Sized;
+        Self: Sized,
+    {
+        Self::from_slice(slice)
+    }
 
     #[inline]
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
