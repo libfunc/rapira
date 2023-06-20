@@ -905,7 +905,7 @@ impl Rapira for Uuid {
     where
         Self: Sized,
     {
-        let bytes = <[u8; 16]>::from_slice(slice)?;
+        let bytes = uuid::Bytes::from_slice(slice)?;
         Ok(Self::from_bytes(bytes))
     }
 
@@ -918,6 +918,7 @@ impl Rapira for Uuid {
     }
 
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        bytes_rapira::convert_to_bytes(self.as_bytes(), slice, cursor);
+        let bytes = self.as_bytes();
+        bytes.convert_to_bytes(slice, cursor);
     }
 }
