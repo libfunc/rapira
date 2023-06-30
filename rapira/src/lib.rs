@@ -11,6 +11,7 @@ pub mod max_cap;
 mod primitive;
 
 pub use error::{RapiraError, Result};
+#[cfg(feature = "zerocopy")]
 pub use implicits::zero;
 pub use primitive::{byte_rapira, bytes_rapira, str_rapira};
 
