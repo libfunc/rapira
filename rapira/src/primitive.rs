@@ -156,6 +156,13 @@ pub mod byte_rapira {
     }
 }
 
+#[inline(always)]
+pub fn into_arr<const N: usize>(slice: &[u8]) -> Result<[u8; N], RapiraError> {
+    let slice = slice.get(..N).ok_or(RapiraError::SliceLenError)?;
+    let arr: &[u8; N] = unsafe { core::mem::transmute_copy(&slice) };
+    Ok(*arr)
+}
+
 macro_rules! impl_for_integer {
     ($type: ident) => {
         impl Rapira for $type {
@@ -166,11 +173,8 @@ macro_rules! impl_for_integer {
             where
                 Self: Sized,
             {
-                let bytes: &[u8; size_of::<$type>()] = slice
-                    .get(..size_of::<$type>())
-                    .ok_or(RapiraError::SliceLenError)?
-                    .try_into()?;
-                let u = <$type>::from_le_bytes(*bytes);
+                let bytes: [u8; size_of::<$type>()] = into_arr(slice)?;
+                let u = <$type>::from_le_bytes(bytes);
 
                 *slice = unsafe { slice.get_unchecked(size_of::<$type>()..) };
                 Ok(u)
@@ -419,11 +423,8 @@ impl Rapira for f32 {
     where
         Self: Sized,
     {
-        let bytes: &[u8; size_of::<Self>()] = slice
-            .get(..size_of::<Self>())
-            .ok_or(RapiraError::SliceLenError)?
-            .try_into()?;
-        let u = f32::from_le_bytes(*bytes);
+        let bytes: [u8; size_of::<Self>()] = into_arr(slice)?;
+        let u = f32::from_le_bytes(bytes);
 
         if !u.is_finite() {
             return Err(RapiraError::FloatIsNaNError);
@@ -438,11 +439,8 @@ impl Rapira for f32 {
     where
         Self: Sized,
     {
-        let bytes: &[u8; size_of::<Self>()] = slice
-            .get(..size_of::<Self>())
-            .ok_or(RapiraError::SliceLenError)?
-            .try_into()?;
-        let u = f32::from_le_bytes(*bytes);
+        let bytes: [u8; size_of::<Self>()] = into_arr(slice)?;
+        let u = f32::from_le_bytes(bytes);
 
         *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
         Ok(u)
@@ -453,11 +451,8 @@ impl Rapira for f32 {
     where
         Self: Sized,
     {
-        let bytes: &[u8; size_of::<Self>()] = slice
-            .get(..size_of::<Self>())
-            .ok_or(RapiraError::SliceLenError)?
-            .try_into()?;
-        let u = Self::from_le_bytes(*bytes);
+        let bytes: [u8; size_of::<Self>()] = into_arr(slice)?;
+        let u = Self::from_le_bytes(bytes);
 
         if !u.is_finite() {
             return Err(RapiraError::FloatIsNaNError);
@@ -515,11 +510,8 @@ impl Rapira for f64 {
     where
         Self: Sized,
     {
-        let bytes: &[u8; size_of::<Self>()] = slice
-            .get(..size_of::<Self>())
-            .ok_or(RapiraError::SliceLenError)?
-            .try_into()?;
-        let u = f64::from_le_bytes(*bytes);
+        let bytes: [u8; size_of::<Self>()] = into_arr(slice)?;
+        let u = f64::from_le_bytes(bytes);
 
         if !u.is_finite() {
             return Err(RapiraError::FloatIsNaNError);
@@ -534,11 +526,8 @@ impl Rapira for f64 {
     where
         Self: Sized,
     {
-        let bytes: &[u8; size_of::<Self>()] = slice
-            .get(..size_of::<Self>())
-            .ok_or(RapiraError::SliceLenError)?
-            .try_into()?;
-        let u = f64::from_le_bytes(*bytes);
+        let bytes: [u8; size_of::<Self>()] = into_arr(slice)?;
+        let u = f64::from_le_bytes(bytes);
 
         *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
         Ok(u)
@@ -549,11 +538,8 @@ impl Rapira for f64 {
     where
         Self: Sized,
     {
-        let bytes: &[u8; size_of::<Self>()] = slice
-            .get(..size_of::<Self>())
-            .ok_or(RapiraError::SliceLenError)?
-            .try_into()?;
-        let u = Self::from_le_bytes(*bytes);
+        let bytes: [u8; size_of::<Self>()] = into_arr(slice)?;
+        let u = Self::from_le_bytes(bytes);
 
         if !u.is_finite() {
             return Err(RapiraError::FloatIsNaNError);
@@ -782,10 +768,7 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
     where
         Self: Sized,
     {
-        let bytes: [u8; CAP] = slice
-            .get(..CAP)
-            .ok_or(RapiraError::SliceLenError)?
-            .try_into()?;
+        let bytes: [u8; CAP] = into_arr(slice)?;
 
         *slice = unsafe { slice.get_unchecked(CAP..) };
         Ok(bytes)

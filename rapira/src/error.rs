@@ -30,7 +30,7 @@ pub enum RapiraError {
     #[cfg_attr(feature = "std", error("max capacity error"))]
     MaxCapacity,
     #[cfg_attr(feature = "std", error(transparent))]
-    TryFromSliceError(#[from] TryFromSliceError),
+    TryFromSliceError(#[cfg_attr(feature = "std", from)] TryFromSliceError),
     #[cfg(feature = "std")]
     #[cfg_attr(feature = "std", error("other error: {0}"))]
     OtherError(&'static str),

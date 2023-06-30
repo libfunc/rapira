@@ -6,6 +6,7 @@ mod allocated;
 pub mod error;
 pub mod funcs;
 mod implicits;
+#[cfg(feature = "std")]
 mod macros;
 pub mod max_cap;
 mod primitive;
@@ -18,9 +19,9 @@ pub use primitive::{byte_rapira, bytes_rapira, str_rapira};
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-pub use funcs::{
-    check_bytes, deser_unchecked, deser_unsafe, deserialize, extend_vec, serialize, size,
-};
+pub use funcs::{check_bytes, deser_unchecked, deser_unsafe, deserialize, size};
+#[cfg(feature = "alloc")]
+pub use funcs::{extend_vec, serialize};
 pub use rapira_derive::Rapira;
 
 pub trait Rapira {

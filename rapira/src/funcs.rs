@@ -1,4 +1,6 @@
 use crate::{Rapira, Result};
+#[cfg(feature = "alloc")]
+use alloc::{vec, vec::Vec};
 
 #[inline]
 pub fn size<T: Rapira>(item: &T) -> usize {

@@ -1,13 +1,20 @@
 use crate::{
-    byte_rapira,
     max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF},
     primitive::bytes_rapira,
-    push, str_rapira, Rapira, RapiraError, Result,
+    str_rapira, Rapira, RapiraError, Result,
 };
-use alloc::borrow::Cow;
+
+#[cfg(feature = "std")]
+use crate::{byte_rapira, push};
 
 #[cfg(feature = "alloc")]
-use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    boxed::Box,
+    collections::BTreeMap,
+    string::String,
+    vec::Vec,
+};
 #[cfg(feature = "std")]
 use std::net::{IpAddr, Ipv6Addr, SocketAddrV6};
 
@@ -143,7 +150,7 @@ impl<T: Rapira> Rapira for Vec<T> {
             return Err(RapiraError::MaxCapacity);
         }
 
-        let size = std::mem::size_of::<Vec<T>>() * len;
+        let size = core::mem::size_of::<Vec<T>>() * len;
 
         if size > VEC_MAX_SIZE_OF {
             return Err(RapiraError::MaxSize);
