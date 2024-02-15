@@ -10,6 +10,7 @@ pub fn size<T: Rapira>(item: &T) -> usize {
     }
 }
 
+/// serialize obect and return vec of bytes
 #[cfg(feature = "alloc")]
 pub fn serialize<T: Rapira>(item: &T) -> Vec<u8> {
     let value_size = size(item);
@@ -19,6 +20,7 @@ pub fn serialize<T: Rapira>(item: &T) -> Vec<u8> {
     bytes
 }
 
+/// extend vec of bytes with serialized object
 #[cfg(feature = "alloc")]
 pub fn extend_vec<T: Rapira>(item: &T, bytes: &mut Vec<u8>) {
     let value_size = size(item);
@@ -45,9 +47,9 @@ where
 ///
 /// Check cursor oveflow,
 /// and check utf-8 strings, float numbers, non zero numbers and others...
-pub fn deserialize<T: Rapira>(mut bytes: &[u8]) -> Result<T>
+pub fn deserialize<T>(mut bytes: &[u8]) -> Result<T>
 where
-    T: Sized,
+    T: Rapira + Sized,
 {
     T::from_slice(&mut bytes)
 }

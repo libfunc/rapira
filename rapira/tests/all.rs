@@ -6,7 +6,7 @@ use zerocopy::{byteorder::U64, AsBytes, FromBytes};
 fn test_bool() {
     let bytes = serialize(&true);
     assert_eq!(bytes.len(), 1);
-    let val = deserialize::<bool>(&bytes).unwrap();
+    let val: bool = deserialize(&bytes).unwrap();
     assert!(val);
     let val = unsafe { deser_unsafe::<bool>(&bytes).unwrap() };
     assert!(val);
@@ -134,7 +134,7 @@ fn test_enum() -> Result<()> {
     };
     let vec = serialize(&c);
     println!("{c:?}");
-    let new_c = deserialize::<FullEnum>(&vec)?;
+    let new_c: FullEnum = deserialize(&vec)?;
     println!("{new_c:?}");
     assert!(c == new_c);
 

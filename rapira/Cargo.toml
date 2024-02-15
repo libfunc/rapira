@@ -1,7 +1,7 @@
 [package]
 name = "rapira"
 description = "serialization library like borsh, bincode and speedy"
-version = "0.6.4"
+version = "0.7.0"
 authors = ["Rail Khusnutdinov <rail@33.run>"]
 keywords = ["serialization"]
 categories = []
@@ -20,29 +20,27 @@ path = "src/lib.rs"
 default = [
     "std",
     "zerocopy",
-    "json",
+    "serde_json",
     "arrayvec",
     "smallvec",
     "indexmap",
-    "decimal",
-    "compact_str",
+    "rust_decimal",
     "bytes",
+    "inline-array",
     "uuid",
+    "compact_str",
 ]
 std = ["thiserror", "alloc", "simdutf8/std"]
 alloc = []
-json = ["serde_json/alloc"]
-decimal = ["rust_decimal"]
-
-[dependencies.rapira-derive]
-version = "0.6.0"
 
 [dependencies]
+rapira-derive = "0.6.0"
+
 thiserror = { version = "1.0", optional = true }
 hashbrown = { version = "0.14", optional = true }
 rustc-hash = { version = "1.1", optional = true, default-features = false }
 zerocopy = { version = "0.6.1", optional = true, features = ["simd"] }
-serde_json = { version = "1.0", optional = true, default-features = false }
+serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] }
 indexmap = { version = "2.0", optional = true, default-features = false }
 arrayvec = { version = "0.7", optional = true }
 smallvec = { version = "1.8", optional = true, features = [
@@ -51,10 +49,11 @@ smallvec = { version = "1.8", optional = true, features = [
     "const_new",
 ] }
 rust_decimal = { version = "1.27", optional = true }
-# time = { version = "0.3", default-features = false }
 compact_str = { version = "0.7", optional = true }
 bytes = { version = "1.4", optional = true }
+inline-array = { version = "0.1", optional = true }
 uuid = { version = "1.3", default-features = false, optional = true }
+# time = { version = "0.3", default-features = false }
 
 [target.'cfg(not(target_env = "aarch64-apple-darwin"))'.dependencies]
 simdutf8 = { version = "0.1", default-features = false }

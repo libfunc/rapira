@@ -5,7 +5,7 @@
 mod allocated;
 pub mod error;
 pub mod funcs;
-mod implicits;
+mod implements;
 #[cfg(feature = "std")]
 mod macros;
 pub mod max_cap;
@@ -13,7 +13,7 @@ mod primitive;
 
 pub use error::{RapiraError, Result};
 #[cfg(feature = "zerocopy")]
-pub use implicits::zero;
+pub use implements::zero;
 pub use primitive::{byte_rapira, bytes_rapira, str_rapira};
 
 #[cfg(feature = "alloc")]
@@ -82,11 +82,32 @@ pub fn push(slice: &mut [u8], cursor: &mut usize, item: u8) {
 }
 
 #[inline]
+pub fn try_push(slice: &mut [u8], cursor: &mut usize, item: u8) -> Result<()> {
+    let s = slice.get_mut(*cursor).ok_or(RapiraError::SliceLenError)?;
+    *s = item;
+    *cursor += 1;
+
+    Ok(())
+}
+
+#[inline]
 pub fn extend(slice: &mut [u8], cursor: &mut usize, items: &[u8]) {
     let end = *cursor + items.len();
     let s = unsafe { slice.get_unchecked_mut(*cursor..end) };
     s.copy_from_slice(items);
     *cursor = end;
+}
+
+#[inline]
+pub fn try_extend(slice: &mut [u8], cursor: &mut usize, items: &[u8]) -> Result<()> {
+    let end = *cursor + items.len();
+    let s = slice
+        .get_mut(*cursor..end)
+        .ok_or(RapiraError::SliceLenError)?;
+    s.copy_from_slice(items);
+    *cursor = end;
+
+    Ok(())
 }
 
 pub const fn static_size<const N: usize>(arr: [Option<usize>; N]) -> Option<usize> {

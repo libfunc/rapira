@@ -8,9 +8,11 @@ use compact_str::CompactString;
 use core::hash::BuildHasherDefault;
 #[cfg(feature = "indexmap")]
 use indexmap::IndexMap;
-#[cfg(feature = "decimal")]
+#[cfg(feature = "inline-array")]
+use inline_array::InlineArray;
+#[cfg(feature = "rust_decimal")]
 use rust_decimal::Decimal;
-#[cfg(feature = "json")]
+#[cfg(feature = "serde_json")]
 use serde_json::{Map, Number, Value};
 #[cfg(feature = "smallvec")]
 use smallvec::SmallVec;
@@ -21,8 +23,6 @@ use uuid::Uuid;
 use crate::max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF};
 #[cfg(feature = "indexmap")]
 use crate::max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF};
-#[cfg(feature = "json")]
-use crate::push;
 #[cfg(feature = "arrayvec")]
 use crate::str_rapira;
 
@@ -347,11 +347,57 @@ impl crate::Rapira for Bytes {
     }
 }
 
+#[cfg(feature = "inline-array")]
+impl crate::Rapira for InlineArray {
+    #[inline]
+    fn size(&self) -> usize {
+        use crate::bytes_rapira;
+
+        bytes_rapira::size(self)
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        use crate::bytes_rapira;
+
+        bytes_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        use crate::bytes_rapira;
+
+        bytes_rapira::convert_to_bytes(self, slice, cursor);
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::bytes_rapira;
+
+        let bytes = bytes_rapira::from_slice(slice)?;
+        Ok(InlineArray::from(bytes))
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::bytes_rapira;
+
+        let bytes = bytes_rapira::from_slice_unsafe(slice)?;
+        Ok(InlineArray::from(bytes))
+    }
+}
+
 #[cfg(feature = "zerocopy")]
 pub mod zero {
     use core::{marker::PhantomData, mem::size_of};
 
-    use crate::extend;
+    use crate::{extend, try_extend};
 
     use zerocopy::{AsBytes, FromBytes};
 
@@ -451,12 +497,13 @@ pub mod zero {
     where
         T: FromBytes + AsBytes + Sized,
     {
-        convert_to_bytes(item, slice, cursor);
+        let bytes = item.as_bytes();
+        try_extend(slice, cursor, bytes)?;
         Ok(())
     }
 }
 
-#[cfg(feature = "json")]
+#[cfg(feature = "serde_json")]
 impl crate::Rapira for Value {
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
@@ -608,6 +655,8 @@ impl crate::Rapira for Value {
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        use crate::push;
+
         match self {
             Value::Null => {
                 push(slice, cursor, 0);
@@ -651,24 +700,26 @@ impl crate::Rapira for Value {
 
     #[inline]
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
+        use crate::try_push;
+
         match self {
             Value::Null => {
-                push(slice, cursor, 0);
+                try_push(slice, cursor, 0)?;
             }
             Value::Bool(v) => {
-                push(slice, cursor, 1);
+                try_push(slice, cursor, 1)?;
                 v.convert_to_bytes(slice, cursor);
             }
             Value::Number(n) => {
-                push(slice, cursor, 2);
+                try_push(slice, cursor, 2)?;
                 if let Some(u) = n.as_u64() {
-                    push(slice, cursor, 0);
+                    try_push(slice, cursor, 0)?;
                     u.convert_to_bytes(slice, cursor);
                 } else if let Some(i) = n.as_i64() {
-                    push(slice, cursor, 1);
+                    try_push(slice, cursor, 1)?;
                     i.convert_to_bytes(slice, cursor);
                 } else if let Some(f) = n.as_f64() {
-                    push(slice, cursor, 2);
+                    try_push(slice, cursor, 2)?;
                     if f.is_infinite() {
                         return Err(crate::RapiraError::FloatIsNaNError);
                     }
@@ -676,15 +727,15 @@ impl crate::Rapira for Value {
                 }
             }
             Value::String(s) => {
-                push(slice, cursor, 3);
+                try_push(slice, cursor, 3)?;
                 s.convert_to_bytes(slice, cursor);
             }
             Value::Array(a) => {
-                push(slice, cursor, 4);
+                try_push(slice, cursor, 4)?;
                 a.try_convert_to_bytes(slice, cursor)?;
             }
             Value::Object(o) => {
-                push(slice, cursor, 5);
+                try_push(slice, cursor, 5)?;
                 let size: u32 = o.len() as u32;
                 size.convert_to_bytes(slice, cursor);
                 for (k, v) in o.iter() {
@@ -713,7 +764,7 @@ impl crate::Rapira for Value {
     }
 }
 
-#[cfg(feature = "decimal")]
+#[cfg(feature = "rust_decimal")]
 impl crate::Rapira for Decimal {
     const STATIC_SIZE: Option<usize> = Some(16);
 

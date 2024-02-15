@@ -5,7 +5,7 @@ use crate::{
 };
 
 #[cfg(feature = "std")]
-use crate::{byte_rapira, push};
+use crate::{byte_rapira, push, try_push};
 
 #[cfg(feature = "alloc")]
 use alloc::{
@@ -488,6 +488,22 @@ impl Rapira for IpAddr {
                 v6.convert_to_bytes(slice, cursor);
             }
         }
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        match self {
+            IpAddr::V4(v4) => {
+                try_push(slice, cursor, 0)?;
+                v4.octets().convert_to_bytes(slice, cursor);
+            }
+            IpAddr::V6(v6) => {
+                try_push(slice, cursor, 1)?;
+                v6.convert_to_bytes(slice, cursor);
+            }
+        }
+
+        Ok(())
     }
 
     #[inline]

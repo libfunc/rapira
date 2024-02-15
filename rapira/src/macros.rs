@@ -1,3 +1,4 @@
+/// usage: let bytes = ser!((a, str_rapira), (&b, byte_rapira) | &c)
 #[macro_export]
 macro_rules! ser {
     ($(($i:expr, $s:path)),* $(| $($t:expr),*)?) => {{
@@ -32,6 +33,7 @@ macro_rules! ser {
     }};
 }
 
+/// usage: let (b1, c1, a1) = deser!(bytes, str_rapira, byte_rapira | u32)
 #[macro_export]
 macro_rules! deser {
     ($bytes:expr, $($s:path),* $(| $($t:ty),*)?) => {{
