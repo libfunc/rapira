@@ -1,6 +1,4 @@
 use crate::{Rapira, Result};
-#[cfg(feature = "alloc")]
-use alloc::{vec, vec::Vec};
 
 #[inline]
 pub fn size<T: Rapira>(item: &T) -> usize {
@@ -33,9 +31,9 @@ pub fn extend_vec<T: Rapira>(item: &T, bytes: &mut Vec<u8>) {
 /// (max memory limit attack...)
 /// check cursor oveflow,
 /// check utf-8 strings, float numbers, non zero numbers and others...
-pub fn check_bytes<T: Rapira>(bytes: &[u8]) -> Result<()>
+pub fn check_bytes<T>(bytes: &[u8]) -> Result<()>
 where
-    T: Sized,
+    T: Rapira + Sized,
 {
     let mut bytes = bytes;
     T::check_bytes(&mut bytes)
@@ -60,9 +58,9 @@ where
 ///
 /// but check cursor oveflow
 /// Another way - data maybe not correct, but not read from other memory
-pub fn deser_unchecked<T: Rapira>(mut bytes: &[u8]) -> Result<T>
+pub fn deser_unchecked<T>(mut bytes: &[u8]) -> Result<T>
 where
-    T: Sized,
+    T: Rapira + Sized,
 {
     T::from_slice_unchecked(&mut bytes)
 }
@@ -76,9 +74,9 @@ where
 /// (max memory limit attack...)
 /// NOT check utf-8 strings, float numbers, non zero numbers and others...
 /// NOT check cursor oveflow
-pub unsafe fn deser_unsafe<T: Rapira>(mut bytes: &[u8]) -> Result<T>
+pub unsafe fn deser_unsafe<T>(mut bytes: &[u8]) -> Result<T>
 where
-    T: Sized,
+    T: Rapira + Sized,
 {
     T::from_slice_unsafe(&mut bytes)
 }

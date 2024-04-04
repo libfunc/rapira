@@ -8,13 +8,7 @@ use crate::{
 use crate::{byte_rapira, push, try_push};
 
 #[cfg(feature = "alloc")]
-use alloc::{
-    borrow::{Cow, ToOwned},
-    boxed::Box,
-    collections::BTreeMap,
-    string::String,
-    vec::Vec,
-};
+use alloc::{borrow::Cow, collections::BTreeMap};
 #[cfg(feature = "std")]
 use std::net::{IpAddr, Ipv6Addr, SocketAddrV6};
 

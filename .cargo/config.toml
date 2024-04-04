@@ -1,11 +1,3 @@
-# On Windows
-# ```
-# cargo install -f cargo-binutils
-# rustup component add llvm-tools-preview
-# ```
-[target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
 # On Linux:
 # - Ubuntu, `sudo apt-get install lld clang`
 # - Arch, `sudo pacman -S lld clang`
@@ -14,5 +6,5 @@ linker = "/usr/bin/cc"
 rustflags = ["-C", "linker=clang", "-C", "link-arg=-fuse-ld=lld"]
 
 # On MacOS M1
-[target.aarch64-apple-darwin]
-rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/bin/zld"]
+# [target.aarch64-apple-darwin]
+# rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/bin/zld"]

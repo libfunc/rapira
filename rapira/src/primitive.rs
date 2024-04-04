@@ -158,9 +158,8 @@ pub mod byte_rapira {
 
 #[inline(always)]
 pub fn into_arr<const N: usize>(slice: &[u8]) -> Result<[u8; N], RapiraError> {
-    let slice = slice.get(..N).ok_or(RapiraError::SliceLenError)?;
-    let arr: &[u8; N] = unsafe { core::mem::transmute_copy(&slice) };
-    Ok(*arr)
+    let slice: &[u8; N] = slice.first_chunk().ok_or(RapiraError::SliceLenError)?;
+    Ok(*slice)
 }
 
 macro_rules! impl_for_integer {
