@@ -1,7 +1,7 @@
 use crate::{enum_static_size, push, static_size, try_push, Rapira, RapiraError, Result};
 use core::{
     mem::{size_of, transmute_copy, MaybeUninit},
-    num::NonZeroU32,
+    num::{NonZeroU32, NonZeroU64},
 };
 
 impl Rapira for () {
@@ -397,6 +397,74 @@ impl Rapira for NonZeroU32 {
     {
         let u = u32::from_slice_unsafe(slice)?;
         let u = NonZeroU32::new_unchecked(u);
+
+        *slice = slice.get_unchecked(size_of::<Self>()..);
+        Ok(u)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let bytes = self.get();
+        bytes.convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        size_of::<Self>()
+    }
+}
+
+impl Rapira for NonZeroU64 {
+    const STATIC_SIZE: Option<usize> = Some(size_of::<Self>());
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        let bytes = slice
+            .get(..size_of::<Self>())
+            .ok_or(RapiraError::SliceLenError)?;
+
+        if bytes == [0u8; size_of::<Self>()] {
+            Err(RapiraError::NonZeroError)
+        } else {
+            *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+            Ok(())
+        }
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let u = u64::from_slice(slice)?;
+        let u = NonZeroU64::new(u).ok_or(RapiraError::NonZeroError)?;
+
+        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+        Ok(u)
+    }
+
+    #[inline]
+    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let u = u64::from_slice(slice)?;
+        let u = unsafe { NonZeroU64::new_unchecked(u) };
+
+        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+        Ok(u)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let u = u64::from_slice_unsafe(slice)?;
+        let u = NonZeroU64::new_unchecked(u);
 
         *slice = slice.get_unchecked(size_of::<Self>()..);
         Ok(u)

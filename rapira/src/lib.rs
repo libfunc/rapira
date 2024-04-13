@@ -4,6 +4,7 @@
 
 mod allocated;
 pub mod error;
+mod from_u8;
 pub mod funcs;
 mod implements;
 #[cfg(feature = "std")]
@@ -12,6 +13,7 @@ pub mod max_cap;
 mod primitive;
 
 pub use error::{RapiraError, Result};
+pub use from_u8::{EnumFromU8Error, FromU8};
 #[cfg(feature = "zerocopy")]
 pub use implements::zero;
 pub use primitive::{byte_rapira, bytes_rapira, str_rapira};
@@ -22,7 +24,7 @@ extern crate alloc;
 pub use funcs::{check_bytes, deser_unchecked, deser_unsafe, deserialize, size};
 #[cfg(feature = "alloc")]
 pub use funcs::{extend_vec, serialize};
-pub use rapira_derive::Rapira;
+pub use rapira_derive::{FromU8, PrimitiveFromEnum, Rapira};
 
 pub trait Rapira {
     const STATIC_SIZE: Option<usize> = None;
