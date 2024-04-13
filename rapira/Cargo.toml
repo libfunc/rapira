@@ -34,7 +34,7 @@ std = ["thiserror", "alloc", "simdutf8/std"]
 alloc = []
 
 [dependencies]
-rapira-derive = "0.6.0"
+rapira-derive = "0.7.0"
 
 thiserror = { version = "1.0", optional = true }
 zerocopy = { version = "0.6.1", optional = true, features = ["simd"] }
