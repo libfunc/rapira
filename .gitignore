@@ -3,3 +3,4 @@ Cargo.lock
 .idea
 .cargo-ok
 .vscode
+.DS_Store

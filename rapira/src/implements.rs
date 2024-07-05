@@ -23,8 +23,6 @@ use uuid::Uuid;
 use crate::max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF};
 #[cfg(feature = "indexmap")]
 use crate::max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF};
-#[cfg(feature = "arrayvec")]
-use crate::str_rapira;
 
 #[cfg(feature = "arrayvec")]
 impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
@@ -146,7 +144,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
         Self: Sized,
     {
         let len = slice.len();
-        str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)?;
+        crate::str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)?;
         let size = len - slice.len();
         if size > CAP {
             Err(crate::RapiraError::SliceLenError)
@@ -160,7 +158,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice(slice)?;
+        let s = crate::str_rapira::from_slice(slice)?;
         let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLenError)?;
         Ok(s)
     }
@@ -170,7 +168,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice_unchecked(slice)?;
+        let s = crate::str_rapira::from_slice_unchecked(slice)?;
         let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLenError)?;
         Ok(s)
     }
@@ -180,18 +178,18 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice_unsafe(slice)?;
+        let s = crate::str_rapira::from_slice_unsafe(slice)?;
         let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLenError)?;
         Ok(s)
     }
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        str_rapira::convert_to_bytes(self, slice, cursor);
+        crate::str_rapira::convert_to_bytes(self, slice, cursor);
     }
 
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
-        str_rapira::try_convert_to_bytes(self, slice, cursor)
+        crate::str_rapira::try_convert_to_bytes(self, slice, cursor)
     }
 }
 
@@ -804,14 +802,14 @@ impl crate::Rapira for CompactString {
     }
 
     fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
-        str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
+        crate::str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
     }
 
     fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice(slice)?;
+        let s = crate::str_rapira::from_slice(slice)?;
         let s = CompactString::new(s);
         Ok(s)
     }
@@ -820,7 +818,7 @@ impl crate::Rapira for CompactString {
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice_unsafe(slice)?;
+        let s = crate::str_rapira::from_slice_unsafe(slice)?;
         let s = CompactString::new(s);
         Ok(s)
     }
@@ -829,17 +827,17 @@ impl crate::Rapira for CompactString {
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice_unchecked(slice)?;
+        let s = crate::str_rapira::from_slice_unchecked(slice)?;
         let s = CompactString::new(s);
         Ok(s)
     }
 
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        str_rapira::convert_to_bytes(self, slice, cursor);
+        crate::str_rapira::convert_to_bytes(self, slice, cursor);
     }
 
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
-        str_rapira::try_convert_to_bytes(self, slice, cursor)
+        crate::str_rapira::try_convert_to_bytes(self, slice, cursor)
     }
 }
 
