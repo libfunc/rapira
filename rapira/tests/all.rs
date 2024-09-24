@@ -105,6 +105,7 @@ enum FullEnum {
 
 #[derive(Debug, Rapira, PartialEq)]
 #[rapira(static_size = None)]
+#[rapira(min_size = 1)]
 enum NonStaticSized {
     A(String),
     B(Box<NonStaticSized>),

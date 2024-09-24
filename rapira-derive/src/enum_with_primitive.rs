@@ -23,6 +23,7 @@ pub fn enum_with_primitive_serializer(
     let mut convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut size: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut enum_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
+    let mut min_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
 
     for variant in &data_enum.variants {
         let variant_name = &variant.ident;
@@ -64,6 +65,10 @@ pub fn enum_with_primitive_serializer(
 
                 enum_sizes.push(quote! {
                     None,
+                });
+
+                min_sizes.push(quote! {
+                    0usize,
                 });
             }
             Fields::Unnamed(fields) => {
@@ -123,6 +128,10 @@ pub fn enum_with_primitive_serializer(
                     enum_sizes.push(quote! {
                         <#typ>::STATIC_SIZE,
                     });
+
+                    min_sizes.push(quote! {
+                        <#typ>::MIN_SIZE,
+                    });
                 } else {
                     let unnamed = &fields.unnamed;
 
@@ -137,6 +146,7 @@ pub fn enum_with_primitive_serializer(
                     let mut unnamed_convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(len);
                     let mut unnamed_size: Vec<TokenStream> = Vec::with_capacity(len);
                     let mut unnamed_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
+                    let mut unnamed_min_sizes: Vec<TokenStream> = Vec::with_capacity(len);
 
                     for (idx, field) in unnamed.iter().enumerate() {
                         let typ = &field.ty;
@@ -166,6 +176,9 @@ pub fn enum_with_primitive_serializer(
                         }) });
                         unnamed_static_sizes.push(quote! {
                             <#typ>::STATIC_SIZE,
+                        });
+                        unnamed_min_sizes.push(quote! {
+                            <#typ>::MIN_SIZE,
                         });
                         field_names.push(quote! { #field_name, });
                     }
@@ -218,6 +231,10 @@ pub fn enum_with_primitive_serializer(
                     enum_sizes.push(quote! {
                         rapira::static_size([#(#unnamed_static_sizes)*]),
                     });
+
+                    min_sizes.push(quote! {
+                        rapira::min_size(&[#(#unnamed_min_sizes)*]),
+                    });
                 }
             }
             Fields::Named(fields) => {
@@ -249,6 +266,7 @@ pub fn enum_with_primitive_serializer(
                 let mut named_convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut named_size: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut named_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut named_min_sizes: Vec<TokenStream> = Vec::with_capacity(len);
 
                 for field in fields_insert.iter().map(|(f, _)| f) {
                     let typ = &field.ty;
@@ -278,6 +296,9 @@ pub fn enum_with_primitive_serializer(
                     }) });
                     named_static_sizes.push(quote! {
                         <#typ>::STATIC_SIZE,
+                    });
+                    named_min_sizes.push(quote! {
+                        <#typ>::MIN_SIZE,
                     });
                     field_names.push(quote! { #field_name, });
                 }
@@ -330,6 +351,10 @@ pub fn enum_with_primitive_serializer(
                 enum_sizes.push(quote! {
                     rapira::static_size([#(#named_static_sizes)*]),
                 });
+
+                min_sizes.push(quote! {
+                    rapira::min_size(&[#(#named_min_sizes)*]),
+                });
             }
         };
     }
@@ -337,6 +362,7 @@ pub fn enum_with_primitive_serializer(
     let gen = quote! {
         impl rapira::Rapira for #name {
             const STATIC_SIZE: Option<usize> = rapira::enum_size([#(#enum_sizes)*]);
+            const MIN_SIZE: usize = rapira::enum_min_size(&[#(#min_sizes)*]);
 
             #[inline]
             fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>

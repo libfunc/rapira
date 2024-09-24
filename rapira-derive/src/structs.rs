@@ -51,6 +51,7 @@ pub fn struct_serializer(
             let mut convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut size: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut static_sizes: Vec<TokenStream> = Vec::with_capacity(named_len);
+            let mut min_size: Vec<TokenStream> = Vec::with_capacity(named_len);
 
             for (field, _, with_attr) in fields_insert.iter() {
                 let ident = field.ident.as_ref().unwrap();
@@ -62,6 +63,9 @@ pub fn struct_serializer(
                     Some(with_attr) => {
                         static_sizes.push(quote! {
                             #with_attr::static_size(core::marker::PhantomData::<#typ>),
+                        });
+                        min_size.push(quote! {
+                            #with_attr::min_size(core::marker::PhantomData::<#typ>),
                         });
                         size.push(
                             quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
@@ -114,6 +118,9 @@ pub fn struct_serializer(
                         static_sizes.push(quote! {
                             <#typ as rapira::Rapira>::STATIC_SIZE,
                         });
+                        min_size.push(quote! {
+                            <#typ as rapira::Rapira>::MIN_SIZE,
+                        });
                     }
                 }
             }
@@ -123,6 +130,7 @@ pub fn struct_serializer(
             let gen = quote! {
                 #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
+                    const MIN_SIZE: usize = rapira::min_size(&[#(#min_size)*]);
 
                     #[inline]
                     fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
@@ -197,6 +205,7 @@ pub fn struct_serializer(
             let mut convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut size: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut static_sizes: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
+            let mut min_size: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
 
             for (idx, field) in unnamed.iter().enumerate() {
                 let id = syn::Lit::Int(LitInt::new(&idx.to_string(), Span::call_site()));
@@ -211,6 +220,9 @@ pub fn struct_serializer(
                     Some(with_attr) => {
                         static_sizes.push(quote! {
                             #with_attr::static_size(core::marker::PhantomData::<#typ>),
+                        });
+                        min_size.push(quote! {
+                            #with_attr::min_size(core::marker::PhantomData::<#typ>),
                         });
                         size.push(
                             quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
@@ -263,6 +275,9 @@ pub fn struct_serializer(
                         static_sizes.push(quote! {
                             <#typ as rapira::Rapira>::STATIC_SIZE,
                         });
+                        min_size.push(quote! {
+                            <#typ as rapira::Rapira>::MIN_SIZE,
+                        });
                     }
                 }
             }
@@ -272,6 +287,7 @@ pub fn struct_serializer(
             let gen = quote! {
                 #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
+                    const MIN_SIZE: usize = rapira::min_size(&[#(#min_size)*]);
 
                     #[inline]
                     fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
@@ -330,6 +346,7 @@ pub fn struct_serializer(
         Fields::Unit => proc_macro::TokenStream::from(quote! {
             impl rapira::Rapira for #name {
                 const STATIC_SIZE: Option<usize> = Some(0);
+                const MIN_SIZE: usize = 0;
 
                 #[inline]
                 fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>

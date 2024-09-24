@@ -9,6 +9,7 @@ pub fn simple_enum_serializer(name: &Ident) -> proc_macro::TokenStream {
     proc_macro::TokenStream::from(quote! {
         impl rapira::Rapira for #name {
             const STATIC_SIZE: Option<usize> = Some(1);
+            const MIN_SIZE: usize = 1;
 
             #[inline]
             fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>

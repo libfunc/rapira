@@ -29,3 +29,18 @@ pub fn enum_static_size(attrs: &[Attribute]) -> Option<Expr> {
         None
     })
 }
+
+/// `#[rapira(min_size = 0)]`
+pub fn min_size(attrs: &[Attribute]) -> Option<Expr> {
+    attrs.iter().find_map(|attr| {
+        if !attr.path().is_ident("rapira") {
+            return None;
+        }
+
+        if let Ok(nv) = attr.parse_args::<MetaNameValue>() {
+            return nv.path.is_ident("min_size").then_some(nv.value);
+        }
+
+        None
+    })
+}

@@ -1,4 +1,4 @@
-use crate::{enum_static_size, push, static_size, try_push, Rapira, RapiraError, Result};
+use crate::{push, static_size, try_push, Rapira, RapiraError, Result};
 use core::{
     mem::{size_of, transmute_copy, MaybeUninit},
     num::{NonZeroU32, NonZeroU64},
@@ -6,6 +6,7 @@ use core::{
 
 impl Rapira for () {
     const STATIC_SIZE: Option<usize> = Some(0);
+    const MIN_SIZE: usize = 0;
 
     #[inline]
     fn check_bytes(_: &mut &[u8]) -> Result<()> {
@@ -39,6 +40,7 @@ impl Rapira for () {
 
 impl Rapira for bool {
     const STATIC_SIZE: Option<usize> = Some(1);
+    const MIN_SIZE: usize = 1;
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -99,6 +101,10 @@ pub mod byte_rapira {
 
     pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize> {
         Some(1)
+    }
+
+    pub const fn min_size<T>(_: PhantomData<T>) -> usize {
+        1
     }
 
     #[inline]
@@ -166,6 +172,7 @@ macro_rules! impl_for_integer {
     ($type: ident) => {
         impl Rapira for $type {
             const STATIC_SIZE: Option<usize> = Some(size_of::<$type>());
+            const MIN_SIZE: usize = size_of::<$type>();
 
             #[inline]
             fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -247,6 +254,7 @@ impl_for_integer!(u128);
 /// as u32
 impl Rapira for usize {
     const STATIC_SIZE: Option<usize> = Some(size_of::<u32>());
+    const MIN_SIZE: usize = size_of::<u32>();
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -298,6 +306,7 @@ impl Rapira for usize {
 /// as i64
 impl Rapira for isize {
     const STATIC_SIZE: Option<usize> = Some(size_of::<i64>());
+    const MIN_SIZE: usize = size_of::<i64>();
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -348,6 +357,7 @@ impl Rapira for isize {
 
 impl Rapira for NonZeroU32 {
     const STATIC_SIZE: Option<usize> = Some(size_of::<Self>());
+    const MIN_SIZE: usize = size_of::<Self>();
 
     #[inline]
     fn check_bytes(slice: &mut &[u8]) -> Result<()>
@@ -416,6 +426,7 @@ impl Rapira for NonZeroU32 {
 
 impl Rapira for NonZeroU64 {
     const STATIC_SIZE: Option<usize> = Some(size_of::<Self>());
+    const MIN_SIZE: usize = size_of::<Self>();
 
     #[inline]
     fn check_bytes(slice: &mut &[u8]) -> Result<()>
@@ -484,6 +495,7 @@ impl Rapira for NonZeroU64 {
 
 impl Rapira for f32 {
     const STATIC_SIZE: Option<usize> = Some(size_of::<Self>());
+    const MIN_SIZE: usize = size_of::<Self>();
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -571,6 +583,7 @@ impl Rapira for f32 {
 
 impl Rapira for f64 {
     const STATIC_SIZE: Option<usize> = Some(size_of::<Self>());
+    const MIN_SIZE: usize = size_of::<Self>();
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -657,7 +670,11 @@ impl Rapira for f64 {
 }
 
 impl<T: Rapira> Rapira for Option<T> {
-    const STATIC_SIZE: Option<usize> = enum_static_size(T::STATIC_SIZE);
+    const STATIC_SIZE: Option<usize> = match T::STATIC_SIZE {
+        Some(s) => Some(s + 1),
+        None => None,
+    };
+    const MIN_SIZE: usize = T::MIN_SIZE + 1;
 
     #[inline]
     fn size(&self) -> usize {
@@ -752,6 +769,7 @@ impl<T: Rapira> Rapira for Option<T> {
 
 impl<const CAP: usize> Rapira for [u8; CAP] {
     const STATIC_SIZE: Option<usize> = Some(CAP);
+    const MIN_SIZE: usize = CAP;
 
     #[inline]
     fn check_bytes(slice: &mut &[u8]) -> Result<()>
@@ -816,6 +834,7 @@ where
     T: Rapira + Sized,
 {
     const STATIC_SIZE: Option<usize> = static_size([T::STATIC_SIZE; CAP]);
+    const MIN_SIZE: usize = CAP * T::MIN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -941,6 +960,7 @@ where
 
 impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
     const STATIC_SIZE: Option<usize> = static_size([T0::STATIC_SIZE, T1::STATIC_SIZE]);
+    const MIN_SIZE: usize = T0::MIN_SIZE + T1::MIN_SIZE;
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -1012,6 +1032,7 @@ impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
 impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
     const STATIC_SIZE: Option<usize> =
         static_size([T0::STATIC_SIZE, T1::STATIC_SIZE, T2::STATIC_SIZE]);
+    const MIN_SIZE: usize = T0::MIN_SIZE + T1::MIN_SIZE + T2::MIN_SIZE;
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -1094,6 +1115,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3)
         T2::STATIC_SIZE,
         T3::STATIC_SIZE,
     ]);
+    const MIN_SIZE: usize = T0::MIN_SIZE + T1::MIN_SIZE + T2::MIN_SIZE + T3::MIN_SIZE;
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -1184,12 +1206,16 @@ pub mod str_rapira {
 
     use simdutf8::basic::from_utf8;
 
-    use crate::{extend, try_extend};
+    use crate::{extend, try_extend, LEN_SIZE};
 
     use super::*;
 
     pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize> {
         None
+    }
+
+    pub const fn min_size<T>(_: PhantomData<T>) -> usize {
+        LEN_SIZE
     }
 
     #[inline]
@@ -1269,12 +1295,16 @@ pub mod str_rapira {
 pub mod bytes_rapira {
     use core::marker::PhantomData;
 
-    use crate::{extend, try_extend};
+    use crate::{extend, try_extend, LEN_SIZE};
 
     use super::*;
 
     pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize> {
         None
+    }
+
+    pub const fn min_size<T>(_: PhantomData<T>) -> usize {
+        LEN_SIZE
     }
 
     #[inline]

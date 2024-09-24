@@ -23,9 +23,12 @@ use uuid::Uuid;
 use crate::max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF};
 #[cfg(feature = "indexmap")]
 use crate::max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF};
+use crate::LEN_SIZE;
 
 #[cfg(feature = "arrayvec")]
 impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         match T::STATIC_SIZE {
@@ -133,6 +136,8 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
 
 #[cfg(feature = "arrayvec")]
 impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         4 + self.len()
@@ -195,6 +200,8 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
 
 #[cfg(feature = "smallvec")]
 impl<T: crate::Rapira, const CAP: usize> crate::Rapira for SmallVec<[T; CAP]> {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         match T::STATIC_SIZE {
@@ -301,6 +308,8 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for SmallVec<[T; CAP]> {
 
 #[cfg(feature = "bytes")]
 impl crate::Rapira for Bytes {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         use crate::bytes_rapira;
@@ -347,6 +356,8 @@ impl crate::Rapira for Bytes {
 
 #[cfg(feature = "inline-array")]
 impl crate::Rapira for InlineArray {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         use crate::bytes_rapira;
@@ -404,6 +415,13 @@ pub mod zero {
         T: FromBytes + AsBytes + Sized,
     {
         Some(size_of::<T>())
+    }
+
+    pub const fn min_size<T>(_: PhantomData<T>) -> usize
+    where
+        T: FromBytes + AsBytes + Sized,
+    {
+        size_of::<T>()
     }
 
     #[inline]
@@ -503,6 +521,8 @@ pub mod zero {
 
 #[cfg(feature = "serde_json")]
 impl crate::Rapira for Value {
+    const MIN_SIZE: usize = 1;
+
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
     where
@@ -765,6 +785,7 @@ impl crate::Rapira for Value {
 #[cfg(feature = "rust_decimal")]
 impl crate::Rapira for Decimal {
     const STATIC_SIZE: Option<usize> = Some(16);
+    const MIN_SIZE: usize = 16;
 
     unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> crate::Result<Self>
     where
@@ -797,6 +818,8 @@ impl crate::Rapira for Decimal {
 
 #[cfg(feature = "compact_str")]
 impl crate::Rapira for CompactString {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     fn size(&self) -> usize {
         4 + self.len()
     }
@@ -847,6 +870,8 @@ where
     K: Eq + core::hash::Hash,
     S: core::hash::Hasher + core::default::Default,
 {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         if let Some(k) = K::STATIC_SIZE {
@@ -962,6 +987,7 @@ where
 #[cfg(feature = "uuid")]
 impl crate::Rapira for Uuid {
     const STATIC_SIZE: Option<usize> = Some(16);
+    const MIN_SIZE: usize = 16;
 
     fn size(&self) -> usize {
         16

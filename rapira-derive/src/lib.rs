@@ -22,6 +22,7 @@ use syn::{parse_macro_input, Data, DeriveInput, Fields, Ident};
 /// - `#[primitive(PrimitiveName)]` - set primitive enum for complex enum
 /// - `#[idx = 1]`
 /// - `#[rapira(static_size = expr)]`
+/// - `#[rapira(min_size = expr)]`
 /// - `#[rapira(with = path)]`
 /// - `#[rapira(skip)]`
 #[proc_macro_derive(Rapira, attributes(rapira, idx, primitive))]
@@ -45,7 +46,8 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     }
                     None => {
                         let enum_static_size = attributes::enum_static_size(&ast.attrs);
-                        enum_serializer(data_enum, name, enum_static_size, ast.generics)
+                        let min_size = attributes::min_size(&ast.attrs);
+                        enum_serializer(data_enum, name, enum_static_size, min_size, ast.generics)
                     }
                 }
             }

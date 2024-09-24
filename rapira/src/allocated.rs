@@ -1,7 +1,7 @@
 use crate::{
     max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF},
     primitive::bytes_rapira,
-    str_rapira, Rapira, RapiraError, Result,
+    str_rapira, Rapira, RapiraError, Result, LEN_SIZE,
 };
 
 #[cfg(feature = "std")]
@@ -14,6 +14,8 @@ use std::net::{IpAddr, Ipv6Addr, SocketAddrV6};
 
 #[cfg(feature = "alloc")]
 impl Rapira for String {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         str_rapira::size(self)
@@ -68,6 +70,8 @@ impl Rapira for String {
 
 #[cfg(feature = "alloc")]
 impl Rapira for Vec<u8> {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         bytes_rapira::size(self)
@@ -111,6 +115,8 @@ impl Rapira for Vec<u8> {
 
 #[cfg(feature = "alloc")]
 impl<T: Rapira> Rapira for Vec<T> {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         match T::STATIC_SIZE {
@@ -218,6 +224,7 @@ impl<T: Rapira> Rapira for Vec<T> {
 #[cfg(feature = "alloc")]
 impl<T: Rapira> Rapira for Box<T> {
     const STATIC_SIZE: Option<usize> = T::STATIC_SIZE;
+    const MIN_SIZE: usize = T::MIN_SIZE;
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -275,6 +282,8 @@ impl<K: Rapira, V: Rapira> Rapira for BTreeMap<K, V>
 where
     K: Ord,
 {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         if let Some(k) = K::STATIC_SIZE {
@@ -368,6 +377,8 @@ where
 
 #[cfg(feature = "alloc")]
 impl<'a> Rapira for Cow<'a, str> {
+    const MIN_SIZE: usize = LEN_SIZE;
+
     #[inline]
     fn size(&self) -> usize {
         str_rapira::size(self)
@@ -424,6 +435,8 @@ impl<'a> Rapira for Cow<'a, str> {
 
 #[cfg(feature = "std")]
 impl Rapira for IpAddr {
+    const MIN_SIZE: usize = 1 + 4;
+
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
     where
@@ -512,6 +525,7 @@ impl Rapira for IpAddr {
 #[cfg(feature = "std")]
 impl Rapira for Ipv6Addr {
     const STATIC_SIZE: Option<usize> = Some(16);
+    const MIN_SIZE: usize = 16;
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>
@@ -555,6 +569,7 @@ impl Rapira for Ipv6Addr {
 #[cfg(feature = "std")]
 impl Rapira for SocketAddrV6 {
     const STATIC_SIZE: Option<usize> = Some(16 + 2);
+    const MIN_SIZE: usize = 16 + 2;
 
     #[inline]
     fn from_slice(slice: &mut &[u8]) -> Result<Self>

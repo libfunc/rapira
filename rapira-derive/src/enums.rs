@@ -15,11 +15,13 @@ pub fn enum_serializer(
     data_enum: &DataEnum,
     name: &Ident,
     static_size: Option<Expr>,
+    min_size: Option<Expr>,
     generics: Generics,
 ) -> proc_macro::TokenStream {
     let variants_len = data_enum.variants.len();
 
     let mut enum_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
+    let mut min_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut size: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut from_slice: Vec<TokenStream> = Vec::with_capacity(variants_len);
@@ -75,6 +77,9 @@ pub fn enum_serializer(
                 enum_sizes.push(quote! {
                     None,
                 });
+                min_sizes.push(quote! {
+                    0,
+                });
             }
             Fields::Unnamed(fields) => {
                 let len = fields.unnamed.len();
@@ -82,6 +87,7 @@ pub fn enum_serializer(
 
                 let mut field_names: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_min_sizes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_size: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_from_slice: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_check_bytes: Vec<TokenStream> = Vec::with_capacity(len);
@@ -101,6 +107,9 @@ pub fn enum_serializer(
                         Some(with_attr) => {
                             fields_static_sizes.push(quote! {
                                 #with_attr::static_size(core::marker::PhantomData::<#typ>),
+                            });
+                            fields_min_sizes.push(quote! {
+                                #with_attr::min_size(core::marker::PhantomData::<#typ>),
                             });
                             fields_size.push(
                                 quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
@@ -130,6 +139,9 @@ pub fn enum_serializer(
                         None => {
                             fields_static_sizes.push(quote! {
                                 <#typ as rapira::Rapira>::STATIC_SIZE,
+                            });
+                            fields_min_sizes.push(quote! {
+                                <#typ as rapira::Rapira>::MIN_SIZE,
                             });
                             fields_size.push(
                                 quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
@@ -166,6 +178,9 @@ pub fn enum_serializer(
                 });
                 enum_sizes.push(quote! {
                     rapira::static_size([#(#fields_static_sizes)*]),
+                });
+                min_sizes.push(quote! {
+                    rapira::min_size(&[#(#fields_min_sizes)*]),
                 });
                 from_slice.push(quote! {
                     #variant_id => {
@@ -235,6 +250,7 @@ pub fn enum_serializer(
                 let mut fields_convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_size: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_min_sizes: Vec<TokenStream> = Vec::with_capacity(len);
 
                 for field in fields_insert.iter().map(|(f, _)| f) {
                     let typ = &field.ty;
@@ -247,6 +263,9 @@ pub fn enum_serializer(
                         Some(with_attr) => {
                             fields_static_sizes.push(quote! {
                                 #with_attr::static_size(core::marker::PhantomData::<#typ>),
+                            });
+                            fields_min_sizes.push(quote! {
+                                #with_attr::min_size(core::marker::PhantomData::<#typ>),
                             });
                             fields_size.push(
                                 quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
@@ -301,6 +320,9 @@ pub fn enum_serializer(
                             fields_static_sizes.push(quote! {
                                 <#typ as rapira::Rapira>::STATIC_SIZE,
                             });
+                            fields_min_sizes.push(quote! {
+                                <#typ as rapira::Rapira>::MIN_SIZE,
+                            });
                         }
                     }
                 }
@@ -312,6 +334,9 @@ pub fn enum_serializer(
                 });
                 enum_sizes.push(quote! {
                     rapira::static_size([#(#fields_static_sizes)*]),
+                });
+                min_sizes.push(quote! {
+                    rapira::min_size(&[#(#fields_min_sizes)*]),
                 });
                 from_slice.push(quote! {
                     #variant_id => {
@@ -367,12 +392,25 @@ pub fn enum_serializer(
             }
         }
     };
+    let min_size = match min_size {
+        Some(min_size) => {
+            quote! {
+                #min_size
+            }
+        }
+        None => {
+            quote! {
+                rapira::enum_min_size(&[#(#min_sizes)*])
+            }
+        }
+    };
 
     let name_with_generics = build_ident(name, generics);
 
     let gen = quote! {
         #name_with_generics {
             const STATIC_SIZE: Option<usize> = #static_size;
+            const MIN_SIZE: usize = #min_size;
 
             #[inline]
             fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>

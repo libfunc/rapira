@@ -28,7 +28,9 @@ pub use rapira_derive::{FromU8, PrimitiveFromEnum, Rapira};
 
 pub trait Rapira {
     const STATIC_SIZE: Option<usize> = None;
+    const MIN_SIZE: usize;
 
+    /// size of bytes for serialize
     fn size(&self) -> usize;
 
     /// check bytes, collections len, check utf-8, NonZero, f32 and others...
@@ -69,12 +71,7 @@ pub trait Rapira {
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize);
 }
 
-pub const fn enum_static_size(s: Option<usize>) -> Option<usize> {
-    match s {
-        Some(s) => Some(s + 1),
-        None => None,
-    }
-}
+pub const LEN_SIZE: usize = 4;
 
 #[inline]
 pub fn push(slice: &mut [u8], cursor: &mut usize, item: u8) {
@@ -115,7 +112,6 @@ pub fn try_extend(slice: &mut [u8], cursor: &mut usize, items: &[u8]) -> Result<
 pub const fn static_size<const N: usize>(arr: [Option<usize>; N]) -> Option<usize> {
     let mut i = 0;
     let mut size = 0;
-    let mut is_static = true;
     while i < arr.len() {
         let item = arr[i];
         match item {
@@ -123,23 +119,17 @@ pub const fn static_size<const N: usize>(arr: [Option<usize>; N]) -> Option<usiz
                 size += s;
             }
             None => {
-                is_static = false;
-                break;
+                return None;
             }
         }
         i += 1;
     }
-    if is_static {
-        Some(size)
-    } else {
-        None
-    }
+    Some(size)
 }
 
 pub const fn enum_size<const N: usize>(arr: [Option<usize>; N]) -> Option<usize> {
     let mut i = 0;
     let mut size = 0;
-    let mut is_static = true;
     let mut is_init = false;
     while i < arr.len() {
         let item = arr[i];
@@ -149,20 +139,42 @@ pub const fn enum_size<const N: usize>(arr: [Option<usize>; N]) -> Option<usize>
                     size = s;
                     is_init = true;
                 } else if s != size {
-                    is_static = false;
-                    break;
+                    return None;
                 }
             }
             None => {
-                is_static = false;
-                break;
+                return None;
             }
         }
         i += 1;
     }
-    if is_static {
-        Some(size + 1)
-    } else {
-        None
+    Some(size + 1)
+}
+
+pub const fn min_size(arr: &'static [usize]) -> usize {
+    let mut i = 0;
+    let mut size = 0;
+    while i < arr.len() {
+        let item = arr[i];
+        size += item;
+        i += 1;
     }
+    size
+}
+
+pub const fn enum_min_size(arr: &'static [usize]) -> usize {
+    let mut i = 0;
+    let mut size = 0;
+    let mut is_init = false;
+    while i < arr.len() {
+        let item = arr[i];
+        if !is_init {
+            size = item;
+            is_init = true;
+        } else if size < item {
+            size = item;
+        }
+        i += 1;
+    }
+    size + 1
 }
