@@ -420,7 +420,7 @@ pub fn enum_serializer(
                 let val: u8 = rapira::byte_rapira::from_slice(slice)?;
                 match val {
                     #(#from_slice)*
-                    _ => Err(rapira::RapiraError::EnumVariantError),
+                    _ => Err(rapira::RapiraError::EnumVariant),
                 }
             }
 
@@ -432,7 +432,7 @@ pub fn enum_serializer(
                 let val: u8 = rapira::byte_rapira::from_slice(slice)?;
                 match val {
                     #(#check_bytes)*
-                    _ => return Err(rapira::RapiraError::EnumVariantError),
+                    _ => return Err(rapira::RapiraError::EnumVariant),
                 }
                 Ok(())
             }
@@ -445,7 +445,7 @@ pub fn enum_serializer(
                 let val: u8 = rapira::byte_rapira::from_slice(slice)?;
                 match val {
                     #(#from_slice_unchecked)*
-                    _ => Err(rapira::RapiraError::EnumVariantError),
+                    _ => Err(rapira::RapiraError::EnumVariant),
                 }
             }
 
@@ -457,7 +457,7 @@ pub fn enum_serializer(
                 let val: u8 = rapira::byte_rapira::from_slice_unsafe(slice)?;
                 match val {
                     #(#from_slice_unsafe)*
-                    _ => Err(rapira::RapiraError::EnumVariantError),
+                    _ => Err(rapira::RapiraError::EnumVariant),
                 }
             }
 

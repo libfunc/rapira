@@ -17,7 +17,7 @@ pub fn simple_enum_serializer(name: &Ident) -> proc_macro::TokenStream {
                 Self: Sized,
             {
                 let val: u8 = rapira::byte_rapira::from_slice(slice)?;
-                <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)
+                <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)
             }
 
             #[inline]
@@ -26,7 +26,7 @@ pub fn simple_enum_serializer(name: &Ident) -> proc_macro::TokenStream {
                 Self: Sized,
             {
                 let val: u8 = rapira::byte_rapira::from_slice(slice)?;
-                <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)?;
                 Ok(())
             }
 
@@ -36,7 +36,7 @@ pub fn simple_enum_serializer(name: &Ident) -> proc_macro::TokenStream {
                 Self: Sized,
             {
                 let val: u8 = rapira::byte_rapira::from_slice(slice)?;
-                <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)
+                <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)
             }
 
             #[inline]
@@ -45,7 +45,7 @@ pub fn simple_enum_serializer(name: &Ident) -> proc_macro::TokenStream {
                 Self: Sized,
             {
                 let val: u8 = rapira::byte_rapira::from_slice_unsafe(slice)?;
-                <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)
+                <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)
             }
 
             #[inline]

@@ -370,7 +370,7 @@ pub fn enum_with_primitive_serializer(
                 Self: Sized,
             {
                 let val: u8 = rapira::byte_rapira::from_slice(slice)?;
-                let t = <#primitive_name as TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                let t = <#primitive_name as TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)?;
                 match t {
                     #(#from_slice)*
                 }
@@ -382,7 +382,7 @@ pub fn enum_with_primitive_serializer(
                 Self: Sized,
             {
                 let val: u8 = rapira::byte_rapira::from_slice(slice)?;
-                let t = <#primitive_name as TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                let t = <#primitive_name as TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)?;
                 match t {
                     #(#check_bytes)*
                 }
@@ -396,7 +396,7 @@ pub fn enum_with_primitive_serializer(
             {
                 let val: u8 = rapira::byte_rapira::from_slice(slice)?;
                 let t = <#primitive_name as TryFrom<u8>>::try_from(val)
-                    .map_err(|_| rapira::RapiraError::EnumVariantError)?;
+                    .map_err(|_| rapira::RapiraError::EnumVariant)?;
                 match t {
                     #(#from_slice_unchecked)*
                 }
