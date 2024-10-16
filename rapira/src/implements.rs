@@ -59,7 +59,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
         let len = usize::from_slice(slice)?;
 
         if len > CAP {
-            return Err(crate::RapiraError::SliceLenError);
+            return Err(crate::RapiraError::SliceLen);
         }
 
         let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
@@ -80,7 +80,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
         let len = u32::from_slice_unchecked(slice)? as usize;
 
         if len > CAP {
-            return Err(crate::RapiraError::SliceLenError);
+            return Err(crate::RapiraError::SliceLen);
         }
 
         let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
@@ -152,7 +152,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
         crate::str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)?;
         let size = len - slice.len();
         if size > CAP {
-            Err(crate::RapiraError::SliceLenError)
+            Err(crate::RapiraError::SliceLen)
         } else {
             Ok(())
         }
@@ -164,7 +164,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
         Self: Sized,
     {
         let s = crate::str_rapira::from_slice(slice)?;
-        let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLenError)?;
+        let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
         Ok(s)
     }
 
@@ -174,7 +174,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
         Self: Sized,
     {
         let s = crate::str_rapira::from_slice_unchecked(slice)?;
-        let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLenError)?;
+        let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
         Ok(s)
     }
 
@@ -184,7 +184,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
         Self: Sized,
     {
         let s = crate::str_rapira::from_slice_unsafe(slice)?;
-        let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLenError)?;
+        let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
         Ok(s)
     }
 
@@ -408,18 +408,18 @@ pub mod zero {
 
     use crate::{extend, try_extend};
 
-    use zerocopy::{AsBytes, FromBytes};
+    use zerocopy::{FromBytes, Immutable, IntoBytes};
 
     pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize>
     where
-        T: FromBytes + AsBytes + Sized,
+        T: Sized,
     {
         Some(size_of::<T>())
     }
 
     pub const fn min_size<T>(_: PhantomData<T>) -> usize
     where
-        T: FromBytes + AsBytes + Sized,
+        T: Sized,
     {
         size_of::<T>()
     }
@@ -427,7 +427,7 @@ pub mod zero {
     #[inline]
     pub fn size<T>(_: &T) -> usize
     where
-        T: FromBytes + AsBytes + Sized,
+        T: Sized,
     {
         size_of::<T>()
     }
@@ -435,11 +435,11 @@ pub mod zero {
     #[inline]
     pub fn check_bytes<T>(_: PhantomData<T>, slice: &mut &[u8]) -> crate::Result<()>
     where
-        T: FromBytes + AsBytes + Sized,
+        T: Sized,
     {
         let size = size_of::<T>();
 
-        *slice = slice.get(size..).ok_or(crate::RapiraError::SliceLenError)?;
+        *slice = slice.get(size..).ok_or(crate::RapiraError::SliceLen)?;
 
         Ok(())
     }
@@ -447,22 +447,22 @@ pub mod zero {
     #[inline]
     pub fn from_slice<T>(slice: &mut &[u8]) -> crate::Result<T>
     where
-        T: FromBytes + AsBytes + Sized,
+        T: FromBytes + Sized,
     {
         let size = size_of::<T>();
-        let bytes: &[u8] = slice.get(..size).ok_or(crate::RapiraError::SliceLenError)?;
+        let bytes: &[u8] = slice.get(..size).ok_or(crate::RapiraError::SliceLen)?;
 
         *slice = unsafe { slice.get_unchecked(size..) };
 
-        let t: T =
-            FromBytes::read_from(bytes).ok_or(crate::RapiraError::OtherError("zerocopy error"))?;
+        let t: T = FromBytes::read_from_bytes(bytes)
+            .map_err(|_| crate::RapiraError::Other("zerocopy error"))?;
         Ok(t)
     }
 
     #[inline]
     pub fn from_slice_unchecked<T>(slice: &mut &[u8]) -> crate::Result<T>
     where
-        T: FromBytes + AsBytes + Sized,
+        T: FromBytes + Sized,
     {
         from_slice(slice)
     }
@@ -483,22 +483,22 @@ pub mod zero {
     #[inline]
     pub unsafe fn from_slice_unsafe<T>(slice: &mut &[u8]) -> crate::Result<T>
     where
-        T: FromBytes + AsBytes + Sized,
+        T: FromBytes + Sized,
     {
         let size = size_of::<T>();
         let bytes: &[u8] = slice.get_unchecked(..size);
 
         *slice = slice.get_unchecked(size..);
 
-        let t: T =
-            FromBytes::read_from(bytes).ok_or(crate::RapiraError::OtherError("zerocopy error"))?;
+        let t: T = FromBytes::read_from_bytes(bytes)
+            .map_err(|_| crate::RapiraError::Other("zerocopy error"))?;
         Ok(t)
     }
 
     #[inline]
     pub fn convert_to_bytes<T>(item: &T, slice: &mut [u8], cursor: &mut usize)
     where
-        T: FromBytes + AsBytes + Sized,
+        T: Immutable + IntoBytes + Sized,
     {
         let bytes = item.as_bytes();
         extend(slice, cursor, bytes);
@@ -511,7 +511,7 @@ pub mod zero {
         cursor: &mut usize,
     ) -> crate::Result<()>
     where
-        T: FromBytes + AsBytes + Sized,
+        T: Immutable + IntoBytes + Sized,
     {
         let bytes = item.as_bytes();
         try_extend(slice, cursor, bytes)?;
@@ -547,10 +547,10 @@ impl crate::Rapira for Value {
                     Ok(Value::Number(i.into()))
                 } else if byte == 2 {
                     let f = f64::from_slice(slice)?;
-                    let number = Number::from_f64(f).ok_or(crate::RapiraError::FloatIsNaNError)?;
+                    let number = Number::from_f64(f).ok_or(crate::RapiraError::FloatIsNaN)?;
                     Ok(Value::Number(number))
                 } else {
-                    Err(crate::RapiraError::EnumVariantError)
+                    Err(crate::RapiraError::EnumVariant)
                 }
             }
             3 => {
@@ -571,7 +571,7 @@ impl crate::Rapira for Value {
                 }
                 Ok(Value::Object(map))
             }
-            _ => Err(crate::RapiraError::EnumVariantError),
+            _ => Err(crate::RapiraError::EnumVariant),
         }
     }
 
@@ -597,7 +597,7 @@ impl crate::Rapira for Value {
                 } else if byte == 2 {
                     f64::check_bytes(slice)?;
                 } else {
-                    return Err(crate::RapiraError::EnumVariantError);
+                    return Err(crate::RapiraError::EnumVariant);
                 }
             }
             3 => {
@@ -613,7 +613,7 @@ impl crate::Rapira for Value {
                     Value::check_bytes(slice)?;
                 }
             }
-            _ => return Err(crate::RapiraError::EnumVariantError),
+            _ => return Err(crate::RapiraError::EnumVariant),
         }
 
         Ok(())
@@ -643,10 +643,10 @@ impl crate::Rapira for Value {
                     Ok(Value::Number(i.into()))
                 } else if byte == 2 {
                     let f = f64::from_slice_unsafe(slice)?;
-                    let number = Number::from_f64(f).ok_or(crate::RapiraError::FloatIsNaNError)?;
+                    let number = Number::from_f64(f).ok_or(crate::RapiraError::FloatIsNaN)?;
                     Ok(Value::Number(number))
                 } else {
-                    Err(crate::RapiraError::EnumVariantError)
+                    Err(crate::RapiraError::EnumVariant)
                 }
             }
             3 => {
@@ -667,7 +667,7 @@ impl crate::Rapira for Value {
                 }
                 Ok(Value::Object(map))
             }
-            _ => Err(crate::RapiraError::EnumVariantError),
+            _ => Err(crate::RapiraError::EnumVariant),
         }
     }
 
@@ -739,7 +739,7 @@ impl crate::Rapira for Value {
                 } else if let Some(f) = n.as_f64() {
                     try_push(slice, cursor, 2)?;
                     if f.is_infinite() {
-                        return Err(crate::RapiraError::FloatIsNaNError);
+                        return Err(crate::RapiraError::FloatIsNaN);
                     }
                     f.try_convert_to_bytes(slice, cursor)?;
                 }

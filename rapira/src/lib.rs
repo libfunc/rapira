@@ -75,6 +75,7 @@ pub const LEN_SIZE: usize = 4;
 
 #[inline]
 pub fn push(slice: &mut [u8], cursor: &mut usize, item: u8) {
+    debug_assert!(slice.len() > *cursor);
     let s = unsafe { slice.get_unchecked_mut(*cursor) };
     *s = item;
     *cursor += 1;
@@ -82,7 +83,7 @@ pub fn push(slice: &mut [u8], cursor: &mut usize, item: u8) {
 
 #[inline]
 pub fn try_push(slice: &mut [u8], cursor: &mut usize, item: u8) -> Result<()> {
-    let s = slice.get_mut(*cursor).ok_or(RapiraError::SliceLenError)?;
+    let s = slice.get_mut(*cursor).ok_or(RapiraError::SliceLen)?;
     *s = item;
     *cursor += 1;
 
@@ -92,6 +93,7 @@ pub fn try_push(slice: &mut [u8], cursor: &mut usize, item: u8) -> Result<()> {
 #[inline]
 pub fn extend(slice: &mut [u8], cursor: &mut usize, items: &[u8]) {
     let end = *cursor + items.len();
+    debug_assert!(slice.len() > end);
     let s = unsafe { slice.get_unchecked_mut(*cursor..end) };
     s.copy_from_slice(items);
     *cursor = end;
@@ -100,9 +102,7 @@ pub fn extend(slice: &mut [u8], cursor: &mut usize, items: &[u8]) {
 #[inline]
 pub fn try_extend(slice: &mut [u8], cursor: &mut usize, items: &[u8]) -> Result<()> {
     let end = *cursor + items.len();
-    let s = slice
-        .get_mut(*cursor..end)
-        .ok_or(RapiraError::SliceLenError)?;
+    let s = slice.get_mut(*cursor..end).ok_or(RapiraError::SliceLen)?;
     s.copy_from_slice(items);
     *cursor = end;
 

@@ -6,23 +6,23 @@ use thiserror::Error;
 #[cfg_attr(feature = "std", derive(Error, Debug))]
 pub enum RapiraError {
     #[cfg_attr(feature = "std", error("iter next error"))]
-    IterNextError,
+    IterNext,
     #[cfg_attr(feature = "std", error("string from utf8 error"))]
-    StringTypeError,
+    StringType,
     #[cfg_attr(feature = "std", error("datetime error"))]
-    DatetimeError,
+    Datetime,
     #[cfg_attr(feature = "std", error("map insert error: args next error"))]
-    MapInsertError,
+    MapInsert,
     #[cfg_attr(feature = "std", error("enum variant error"))]
-    EnumVariantError,
+    EnumVariant,
     #[cfg_attr(feature = "std", error("non zero to zero"))]
-    FloatIsNaNError,
+    FloatIsNaN,
     #[cfg_attr(feature = "std", error("float is NaN"))]
-    DecimalError,
+    Decimal,
     #[cfg_attr(feature = "std", error("decimal scale error"))]
-    NonZeroError,
+    NonZero,
     #[cfg_attr(feature = "std", error("slice len error"))]
-    SliceLenError,
+    SliceLen,
     #[cfg_attr(feature = "std", error("from arr not implemented"))]
     FromArrNotImplemented,
     #[cfg_attr(feature = "std", error("max size error"))]
@@ -30,10 +30,10 @@ pub enum RapiraError {
     #[cfg_attr(feature = "std", error("max capacity error"))]
     MaxCapacity,
     #[cfg_attr(feature = "std", error(transparent))]
-    TryFromSliceError(#[cfg_attr(feature = "std", from)] TryFromSliceError),
+    TryFromSlice(#[cfg_attr(feature = "std", from)] TryFromSliceError),
     #[cfg(feature = "std")]
     #[cfg_attr(feature = "std", error("other error: {0}"))]
-    OtherError(&'static str),
+    Other(&'static str),
 }
 
 pub type Result<T, E = RapiraError> = core::result::Result<T, E>;

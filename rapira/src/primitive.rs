@@ -47,7 +47,7 @@ impl Rapira for bool {
     where
         Self: Sized,
     {
-        let byte = *slice.first().ok_or(RapiraError::SliceLenError)?;
+        let byte = *slice.first().ok_or(RapiraError::SliceLen)?;
 
         *slice = unsafe { slice.get_unchecked(1..) };
         Ok(byte != 0)
@@ -58,7 +58,7 @@ impl Rapira for bool {
     where
         Self: Sized,
     {
-        *slice = slice.get(1..).ok_or(RapiraError::SliceLenError)?;
+        *slice = slice.get(1..).ok_or(RapiraError::SliceLen)?;
 
         Ok(())
     }
@@ -82,7 +82,7 @@ impl Rapira for bool {
 
     #[inline]
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
-        let byte = slice.get_mut(*cursor).ok_or(RapiraError::SliceLenError)?;
+        let byte = slice.get_mut(*cursor).ok_or(RapiraError::SliceLen)?;
         *byte = u8::from(*self);
         *cursor += 1;
         Ok(())
@@ -114,13 +114,13 @@ pub mod byte_rapira {
 
     #[inline]
     pub fn check_bytes<T>(_: PhantomData<T>, slice: &mut &[u8]) -> Result<()> {
-        *slice = slice.get(1..).ok_or(RapiraError::SliceLenError)?;
+        *slice = slice.get(1..).ok_or(RapiraError::SliceLen)?;
         Ok(())
     }
 
     #[inline]
     pub fn from_slice(slice: &mut &[u8]) -> Result<u8> {
-        let byte = *slice.first().ok_or(RapiraError::SliceLenError)?;
+        let byte = *slice.first().ok_or(RapiraError::SliceLen)?;
         *slice = unsafe { slice.get_unchecked(1..) };
         Ok(byte)
     }
@@ -155,7 +155,7 @@ pub mod byte_rapira {
 
     #[inline]
     pub fn try_convert_to_bytes(item: &u8, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
-        let byte = slice.get_mut(*cursor).ok_or(RapiraError::SliceLenError)?;
+        let byte = slice.get_mut(*cursor).ok_or(RapiraError::SliceLen)?;
         *byte = *item;
         *cursor += 1;
         Ok(())
@@ -164,7 +164,7 @@ pub mod byte_rapira {
 
 #[inline(always)]
 pub fn into_arr<const N: usize>(slice: &[u8]) -> Result<[u8; N], RapiraError> {
-    let slice: &[u8; N] = slice.first_chunk().ok_or(RapiraError::SliceLenError)?;
+    let slice: &[u8; N] = slice.first_chunk().ok_or(RapiraError::SliceLen)?;
     Ok(*slice)
 }
 
@@ -193,7 +193,7 @@ macro_rules! impl_for_integer {
             {
                 *slice = slice
                     .get(size_of::<$type>()..)
-                    .ok_or(RapiraError::SliceLenError)?;
+                    .ok_or(RapiraError::SliceLen)?;
 
                 Ok(())
             }
@@ -225,9 +225,7 @@ macro_rules! impl_for_integer {
             fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
                 let bytes = self.to_le_bytes();
                 let end = *cursor + size_of::<$type>();
-                let s = slice
-                    .get_mut(*cursor..end)
-                    .ok_or(RapiraError::SliceLenError)?;
+                let s = slice.get_mut(*cursor..end).ok_or(RapiraError::SliceLen)?;
                 s.copy_from_slice(&bytes);
                 *cursor = end;
                 Ok(())
@@ -289,9 +287,7 @@ impl Rapira for usize {
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         let bytes = (*self as u32).to_le_bytes();
         let end = *cursor + size_of::<u32>();
-        let s = slice
-            .get_mut(*cursor..end)
-            .ok_or(RapiraError::SliceLenError)?;
+        let s = slice.get_mut(*cursor..end).ok_or(RapiraError::SliceLen)?;
         s.copy_from_slice(&bytes);
         *cursor = end;
         Ok(())
@@ -341,9 +337,7 @@ impl Rapira for isize {
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         let bytes = (*self as i64).to_le_bytes();
         let end = *cursor + size_of::<i64>();
-        let s = slice
-            .get_mut(*cursor..end)
-            .ok_or(RapiraError::SliceLenError)?;
+        let s = slice.get_mut(*cursor..end).ok_or(RapiraError::SliceLen)?;
         s.copy_from_slice(&bytes);
         *cursor = end;
         Ok(())
@@ -366,10 +360,10 @@ impl Rapira for NonZeroU32 {
     {
         let bytes = slice
             .get(..size_of::<Self>())
-            .ok_or(RapiraError::SliceLenError)?;
+            .ok_or(RapiraError::SliceLen)?;
 
         if bytes == [0u8; size_of::<Self>()] {
-            Err(RapiraError::NonZeroError)
+            Err(RapiraError::NonZero)
         } else {
             *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
             Ok(())
@@ -382,7 +376,7 @@ impl Rapira for NonZeroU32 {
         Self: Sized,
     {
         let u = u32::from_slice(slice)?;
-        let u = NonZeroU32::new(u).ok_or(RapiraError::NonZeroError)?;
+        let u = NonZeroU32::new(u).ok_or(RapiraError::NonZero)?;
 
         *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
         Ok(u)
@@ -435,10 +429,10 @@ impl Rapira for NonZeroU64 {
     {
         let bytes = slice
             .get(..size_of::<Self>())
-            .ok_or(RapiraError::SliceLenError)?;
+            .ok_or(RapiraError::SliceLen)?;
 
         if bytes == [0u8; size_of::<Self>()] {
-            Err(RapiraError::NonZeroError)
+            Err(RapiraError::NonZero)
         } else {
             *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
             Ok(())
@@ -451,7 +445,7 @@ impl Rapira for NonZeroU64 {
         Self: Sized,
     {
         let u = u64::from_slice(slice)?;
-        let u = NonZeroU64::new(u).ok_or(RapiraError::NonZeroError)?;
+        let u = NonZeroU64::new(u).ok_or(RapiraError::NonZero)?;
 
         *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
         Ok(u)
@@ -506,7 +500,7 @@ impl Rapira for f32 {
         let u = f32::from_le_bytes(bytes);
 
         if !u.is_finite() {
-            return Err(RapiraError::FloatIsNaNError);
+            return Err(RapiraError::FloatIsNaN);
         }
 
         *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
@@ -534,7 +528,7 @@ impl Rapira for f32 {
         let u = Self::from_le_bytes(bytes);
 
         if !u.is_finite() {
-            return Err(RapiraError::FloatIsNaNError);
+            return Err(RapiraError::FloatIsNaN);
         }
 
         *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
@@ -560,7 +554,7 @@ impl Rapira for f32 {
     #[inline]
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         if !self.is_finite() {
-            return Err(RapiraError::FloatIsNaNError);
+            return Err(RapiraError::FloatIsNaN);
         }
         self.convert_to_bytes(slice, cursor);
         Ok(())
@@ -594,7 +588,7 @@ impl Rapira for f64 {
         let u = f64::from_le_bytes(bytes);
 
         if !u.is_finite() {
-            return Err(RapiraError::FloatIsNaNError);
+            return Err(RapiraError::FloatIsNaN);
         }
 
         *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
@@ -622,7 +616,7 @@ impl Rapira for f64 {
         let u = Self::from_le_bytes(bytes);
 
         if !u.is_finite() {
-            return Err(RapiraError::FloatIsNaNError);
+            return Err(RapiraError::FloatIsNaN);
         }
 
         *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
@@ -648,7 +642,7 @@ impl Rapira for f64 {
     #[inline]
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         if !self.is_finite() {
-            return Err(RapiraError::FloatIsNaNError);
+            return Err(RapiraError::FloatIsNaN);
         }
         self.convert_to_bytes(slice, cursor);
         Ok(())
@@ -776,7 +770,7 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
     where
         Self: Sized,
     {
-        *slice = slice.get(CAP..).ok_or(RapiraError::SliceLenError)?;
+        *slice = slice.get(CAP..).ok_or(RapiraError::SliceLen)?;
         Ok(())
     }
 
@@ -815,9 +809,7 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
     #[inline]
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
         let end = *cursor + CAP;
-        let s = slice
-            .get_mut(*cursor..end)
-            .ok_or(RapiraError::SliceLenError)?;
+        let s = slice.get_mut(*cursor..end).ok_or(RapiraError::SliceLen)?;
         s.copy_from_slice(self);
         *cursor = end;
         Ok(())
@@ -862,11 +854,11 @@ where
         for i in 0..CAP {
             match T::from_slice(slice) {
                 Ok(val) => {
-                    arr.get_mut(i).ok_or(RapiraError::SliceLenError)?.write(val);
+                    arr.get_mut(i).ok_or(RapiraError::SliceLen)?.write(val);
                 }
                 Err(err) => {
                     if i != 0 {
-                        let s = arr.get_mut(0..i).ok_or(RapiraError::SliceLenError)?;
+                        let s = arr.get_mut(0..i).ok_or(RapiraError::SliceLen)?;
 
                         for item in s {
                             unsafe {
@@ -1226,9 +1218,9 @@ pub mod str_rapira {
     #[inline]
     pub fn check_bytes<T>(_: PhantomData<T>, slice: &mut &[u8]) -> Result<()> {
         let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLen)?;
 
-        let _ = from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
+        let _ = from_utf8(bytes).map_err(|_| RapiraError::StringType)?;
 
         *slice = unsafe { slice.get_unchecked(len..) };
         Ok(())
@@ -1237,8 +1229,8 @@ pub mod str_rapira {
     #[inline]
     pub fn from_slice<'a>(slice: &mut &'a [u8]) -> Result<&'a str> {
         let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
-        let s = from_utf8(bytes).map_err(|_| RapiraError::StringTypeError)?;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLen)?;
+        let s = from_utf8(bytes).map_err(|_| RapiraError::StringType)?;
 
         *slice = unsafe { slice.get_unchecked(len..) };
         Ok(s)
@@ -1247,7 +1239,7 @@ pub mod str_rapira {
     #[inline]
     pub fn from_slice_unchecked<'a>(slice: &mut &'a [u8]) -> Result<&'a str> {
         let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLen)?;
         let s = unsafe { core::str::from_utf8_unchecked(bytes) };
 
         *slice = unsafe { slice.get_unchecked(len..) };
@@ -1315,14 +1307,14 @@ pub mod bytes_rapira {
     #[inline]
     pub fn check_bytes<T>(_: PhantomData<T>, slice: &mut &[u8]) -> Result<()> {
         let len = u32::from_slice(slice)? as usize;
-        *slice = slice.get(len..).ok_or(RapiraError::SliceLenError)?;
+        *slice = slice.get(len..).ok_or(RapiraError::SliceLen)?;
         Ok(())
     }
 
     #[inline]
     pub fn from_slice<'a>(slice: &mut &'a [u8]) -> Result<&'a [u8]> {
         let len = u32::from_slice(slice)? as usize;
-        let bytes = slice.get(..len).ok_or(RapiraError::SliceLenError)?;
+        let bytes = slice.get(..len).ok_or(RapiraError::SliceLen)?;
         *slice = unsafe { slice.get_unchecked(len..) };
         Ok(bytes)
     }

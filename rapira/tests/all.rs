@@ -1,6 +1,8 @@
-use byteorder::LE;
 use rapira::*;
-use zerocopy::{byteorder::U64, AsBytes, FromBytes, FromZeroes};
+use zerocopy::{
+    byteorder::{LE, U64},
+    FromBytes, Immutable, IntoBytes, KnownLayout,
+};
 
 #[test]
 fn test_bool() {
@@ -58,7 +60,7 @@ fn test_unnamed_fields() -> Result<()> {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes, FromZeroes, PartialEq, Debug)]
+#[derive(Copy, Clone, IntoBytes, FromBytes, PartialEq, Debug, Immutable, KnownLayout)]
 struct Zero {
     a: [u8; 16],
     b: U64<LE>,
