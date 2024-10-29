@@ -49,7 +49,7 @@ impl Rapira for bool {
     {
         let byte = *slice.first().ok_or(RapiraError::SliceLen)?;
 
-        *slice = unsafe { slice.get_unchecked(1..) };
+        *slice = &slice[1..];
         Ok(byte != 0)
     }
 
@@ -75,8 +75,7 @@ impl Rapira for bool {
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        let byte = unsafe { slice.get_unchecked_mut(*cursor) };
-        *byte = u8::from(*self);
+        slice[*cursor] = u8::from(*self);
         *cursor += 1;
     }
 
@@ -121,12 +120,15 @@ pub mod byte_rapira {
     #[inline]
     pub fn from_slice(slice: &mut &[u8]) -> Result<u8> {
         let byte = *slice.first().ok_or(RapiraError::SliceLen)?;
-        *slice = unsafe { slice.get_unchecked(1..) };
+        *slice = &slice[1..];
         Ok(byte)
     }
 
+    /// # Safety
+    ///
+    /// See funcs::deser_unchecked
     #[inline]
-    pub fn from_slice_unchecked(slice: &mut &[u8]) -> Result<u8> {
+    pub unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<u8> {
         from_slice(slice)
     }
 
@@ -148,8 +150,7 @@ pub mod byte_rapira {
 
     #[inline]
     pub fn convert_to_bytes(item: &u8, slice: &mut [u8], cursor: &mut usize) {
-        let byte = unsafe { slice.get_unchecked_mut(*cursor) };
-        *byte = *item;
+        slice[*cursor] = *item;
         *cursor += 1;
     }
 
@@ -182,7 +183,7 @@ macro_rules! impl_for_integer {
                 let bytes: [u8; size_of::<$type>()] = into_arr(slice)?;
                 let u = <$type>::from_le_bytes(bytes);
 
-                *slice = unsafe { slice.get_unchecked(size_of::<$type>()..) };
+                *slice = &slice[size_of::<$type>()..];
                 Ok(u)
             }
 
@@ -216,7 +217,7 @@ macro_rules! impl_for_integer {
             fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
                 let bytes = self.to_le_bytes();
                 let end = *cursor + size_of::<$type>();
-                let s = unsafe { slice.get_unchecked_mut(*cursor..end) };
+                let s = &mut slice[*cursor..end];
                 s.copy_from_slice(&bytes);
                 *cursor = end;
             }
@@ -365,7 +366,7 @@ impl Rapira for NonZeroU32 {
         if bytes == [0u8; size_of::<Self>()] {
             Err(RapiraError::NonZero)
         } else {
-            *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+            *slice = &slice[size_of::<Self>()..];
             Ok(())
         }
     }
@@ -378,12 +379,12 @@ impl Rapira for NonZeroU32 {
         let u = u32::from_slice(slice)?;
         let u = NonZeroU32::new(u).ok_or(RapiraError::NonZero)?;
 
-        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+        *slice = &slice[size_of::<Self>()..];
         Ok(u)
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -434,7 +435,7 @@ impl Rapira for NonZeroU64 {
         if bytes == [0u8; size_of::<Self>()] {
             Err(RapiraError::NonZero)
         } else {
-            *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+            *slice = &slice[size_of::<Self>()..];
             Ok(())
         }
     }
@@ -447,12 +448,12 @@ impl Rapira for NonZeroU64 {
         let u = u64::from_slice(slice)?;
         let u = NonZeroU64::new(u).ok_or(RapiraError::NonZero)?;
 
-        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+        *slice = &slice[size_of::<Self>()..];
         Ok(u)
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -503,12 +504,12 @@ impl Rapira for f32 {
             return Err(RapiraError::FloatIsNaN);
         }
 
-        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+        *slice = &slice[size_of::<Self>()..];
         Ok(u)
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -531,7 +532,7 @@ impl Rapira for f32 {
             return Err(RapiraError::FloatIsNaN);
         }
 
-        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+        *slice = &slice[size_of::<Self>()..];
 
         Ok(())
     }
@@ -562,10 +563,10 @@ impl Rapira for f32 {
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        assert!(self.is_finite(), "f32 is not finite");
         let bytes = self.to_le_bytes();
         let end = *cursor + size_of::<Self>();
-        let s = unsafe { slice.get_unchecked_mut(*cursor..end) };
-        s.copy_from_slice(&bytes);
+        slice[*cursor..end].copy_from_slice(&bytes);
         *cursor = end;
     }
 
@@ -591,12 +592,12 @@ impl Rapira for f64 {
             return Err(RapiraError::FloatIsNaN);
         }
 
-        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+        *slice = &slice[size_of::<Self>()..];
         Ok(u)
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -619,7 +620,7 @@ impl Rapira for f64 {
             return Err(RapiraError::FloatIsNaN);
         }
 
-        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
+        *slice = &slice[size_of::<Self>()..];
 
         Ok(())
     }
@@ -650,10 +651,10 @@ impl Rapira for f64 {
 
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        assert!(self.is_finite(), "f64 is not finite");
         let bytes = self.to_le_bytes();
         let end = *cursor + size_of::<Self>();
-        let s = unsafe { slice.get_unchecked_mut(*cursor..end) };
-        s.copy_from_slice(&bytes);
+        slice[*cursor..end].copy_from_slice(&bytes);
         *cursor = end;
     }
 
@@ -706,7 +707,7 @@ impl<T: Rapira> Rapira for Option<T> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -801,8 +802,7 @@ impl<const CAP: usize> Rapira for [u8; CAP] {
     #[inline]
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
         let end = *cursor + CAP;
-        let s = unsafe { slice.get_unchecked_mut(*cursor..end) };
-        s.copy_from_slice(self);
+        slice[*cursor..end].copy_from_slice(self);
         *cursor = end;
     }
 
@@ -877,7 +877,7 @@ where
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -975,7 +975,7 @@ impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1049,7 +1049,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1134,7 +1134,7 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3)
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -1222,7 +1222,7 @@ pub mod str_rapira {
 
         let _ = from_utf8(bytes).map_err(|_| RapiraError::StringType)?;
 
-        *slice = unsafe { slice.get_unchecked(len..) };
+        *slice = &slice[len..];
         Ok(())
     }
 
@@ -1232,12 +1232,15 @@ pub mod str_rapira {
         let bytes = slice.get(..len).ok_or(RapiraError::SliceLen)?;
         let s = from_utf8(bytes).map_err(|_| RapiraError::StringType)?;
 
-        *slice = unsafe { slice.get_unchecked(len..) };
+        *slice = &slice[len..];
         Ok(s)
     }
 
+    /// # Safety
+    ///
+    /// see funcs::deser_unchecked
     #[inline]
-    pub fn from_slice_unchecked<'a>(slice: &mut &'a [u8]) -> Result<&'a str> {
+    pub unsafe fn from_slice_unchecked<'a>(slice: &mut &'a [u8]) -> Result<&'a str> {
         let len = u32::from_slice(slice)? as usize;
         let bytes = slice.get(..len).ok_or(RapiraError::SliceLen)?;
         let s = unsafe { core::str::from_utf8_unchecked(bytes) };
@@ -1315,12 +1318,15 @@ pub mod bytes_rapira {
     pub fn from_slice<'a>(slice: &mut &'a [u8]) -> Result<&'a [u8]> {
         let len = u32::from_slice(slice)? as usize;
         let bytes = slice.get(..len).ok_or(RapiraError::SliceLen)?;
-        *slice = unsafe { slice.get_unchecked(len..) };
+        *slice = &slice[len..];
         Ok(bytes)
     }
 
+    /// # Safety
+    ///
+    /// see funcs::deser_unchecked
     #[inline]
-    pub fn from_slice_unchecked<'a>(slice: &mut &'a [u8]) -> Result<&'a [u8]> {
+    pub unsafe fn from_slice_unchecked<'a>(slice: &mut &'a [u8]) -> Result<&'a [u8]> {
         from_slice(slice)
     }
 

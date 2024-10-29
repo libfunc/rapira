@@ -13,8 +13,7 @@ pub fn size<T: Rapira>(item: &T) -> usize {
 pub fn serialize<T: Rapira>(item: &T) -> Vec<u8> {
     let value_size = size(item);
     let mut bytes: Vec<u8> = vec![0u8; value_size];
-    let mut cursor = 0usize;
-    item.convert_to_bytes(&mut bytes, &mut cursor);
+    item.convert_to_bytes(&mut bytes, &mut 0);
     bytes
 }
 
@@ -52,13 +51,16 @@ where
     T::from_slice(&mut bytes)
 }
 
+/// # Safety
+///
 /// NOT check oversize vec and other items with capacity initialization
 /// (max memory limit attack...)
-/// NOT check utf-8 strings, float numbers, non zero numbers and others...
+/// NOT check utf-8 strings, float numbers, non zero numbers,
+/// Arrayvec len and others...
 ///
 /// but check cursor oveflow
 /// Another way - data maybe not correct, but not read from other memory
-pub fn deser_unchecked<T>(mut bytes: &[u8]) -> Result<T>
+pub unsafe fn deser_unchecked<T>(mut bytes: &[u8]) -> Result<T>
 where
     T: Rapira + Sized,
 {

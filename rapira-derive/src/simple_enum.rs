@@ -31,7 +31,7 @@ pub fn simple_enum_serializer(name: &Ident) -> proc_macro::TokenStream {
             }
 
             #[inline]
-            fn from_slice_unchecked(slice: &mut &[u8]) -> rapira::Result<Self>
+            unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> rapira::Result<Self>
             where
                 Self: Sized,
             {

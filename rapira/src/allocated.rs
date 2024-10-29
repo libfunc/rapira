@@ -40,7 +40,7 @@ impl Rapira for String {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -167,7 +167,7 @@ impl<T: Rapira> Rapira for Vec<T> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -244,7 +244,7 @@ impl<T: Rapira> Rapira for Box<T> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -327,7 +327,7 @@ where
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self> {
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self> {
         let len = u32::from_slice(slice)? as usize;
         let mut map = BTreeMap::<K, V>::new();
         for _ in 0..len {
@@ -376,7 +376,7 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a> Rapira for Cow<'a, str> {
+impl Rapira for Cow<'_, str> {
     const MIN_SIZE: usize = LEN_SIZE;
 
     #[inline]
@@ -403,7 +403,7 @@ impl<'a> Rapira for Cow<'a, str> {
     }
 
     #[inline]
-    fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
     {
@@ -502,11 +502,11 @@ impl Rapira for IpAddr {
         match self {
             IpAddr::V4(v4) => {
                 try_push(slice, cursor, 0)?;
-                v4.octets().convert_to_bytes(slice, cursor);
+                v4.octets().try_convert_to_bytes(slice, cursor)?;
             }
             IpAddr::V6(v6) => {
                 try_push(slice, cursor, 1)?;
-                v6.convert_to_bytes(slice, cursor);
+                v6.try_convert_to_bytes(slice, cursor)?;
             }
         }
 
@@ -561,6 +561,11 @@ impl Rapira for Ipv6Addr {
     }
 
     #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        self.octets().try_convert_to_bytes(slice, cursor)
+    }
+
+    #[inline]
     fn size(&self) -> usize {
         16
     }
@@ -606,6 +611,14 @@ impl Rapira for SocketAddrV6 {
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
         self.ip().convert_to_bytes(slice, cursor);
         self.port().convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        self.ip().try_convert_to_bytes(slice, cursor)?;
+        self.port().try_convert_to_bytes(slice, cursor)?;
+
+        Ok(())
     }
 
     #[inline]

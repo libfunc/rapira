@@ -438,7 +438,7 @@ pub fn enum_serializer(
             }
 
             #[inline]
-            fn from_slice_unchecked(slice: &mut &[u8]) -> rapira::Result<Self>
+            unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> rapira::Result<Self>
             where
                 Self: Sized,
             {
