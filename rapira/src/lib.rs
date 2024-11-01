@@ -77,7 +77,6 @@ pub const LEN_SIZE: usize = 4;
 
 #[inline]
 pub fn push(slice: &mut [u8], cursor: &mut usize, item: u8) {
-    debug_assert!(slice.len() > *cursor);
     let s = slice.get_mut(*cursor).unwrap();
     *s = item;
     *cursor += 1;
@@ -95,7 +94,6 @@ pub fn try_push(slice: &mut [u8], cursor: &mut usize, item: u8) -> Result<()> {
 #[inline]
 pub fn extend(slice: &mut [u8], cursor: &mut usize, items: &[u8]) {
     let end = *cursor + items.len();
-    debug_assert!(slice.len() > end);
     let s = slice.get_mut(*cursor..end).unwrap();
     s.copy_from_slice(items);
     *cursor = end;
