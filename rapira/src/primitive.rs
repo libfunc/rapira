@@ -378,8 +378,6 @@ impl Rapira for NonZeroU32 {
     {
         let u = u32::from_slice(slice)?;
         let u = NonZeroU32::new(u).ok_or(RapiraError::NonZero)?;
-
-        *slice = &slice[size_of::<Self>()..];
         Ok(u)
     }
 
@@ -390,8 +388,6 @@ impl Rapira for NonZeroU32 {
     {
         let u = u32::from_slice(slice)?;
         let u = unsafe { NonZeroU32::new_unchecked(u) };
-
-        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
         Ok(u)
     }
 
@@ -402,8 +398,6 @@ impl Rapira for NonZeroU32 {
     {
         let u = u32::from_slice_unsafe(slice)?;
         let u = NonZeroU32::new_unchecked(u);
-
-        *slice = slice.get_unchecked(size_of::<Self>()..);
         Ok(u)
     }
 
@@ -447,8 +441,6 @@ impl Rapira for NonZeroU64 {
     {
         let u = u64::from_slice(slice)?;
         let u = NonZeroU64::new(u).ok_or(RapiraError::NonZero)?;
-
-        *slice = &slice[size_of::<Self>()..];
         Ok(u)
     }
 
@@ -459,8 +451,6 @@ impl Rapira for NonZeroU64 {
     {
         let u = u64::from_slice(slice)?;
         let u = unsafe { NonZeroU64::new_unchecked(u) };
-
-        *slice = unsafe { slice.get_unchecked(size_of::<Self>()..) };
         Ok(u)
     }
 
@@ -471,8 +461,6 @@ impl Rapira for NonZeroU64 {
     {
         let u = u64::from_slice_unsafe(slice)?;
         let u = NonZeroU64::new_unchecked(u);
-
-        *slice = slice.get_unchecked(size_of::<Self>()..);
         Ok(u)
     }
 
