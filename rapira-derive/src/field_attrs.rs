@@ -37,7 +37,10 @@ pub fn extract_with_attr(attrs: &[Attribute]) -> Option<ExprPath> {
         }
 
         let Expr::Path(path) = nv.value else {
-            panic!("invalid 'with' path value: `{}`", nv.value.into_token_stream());
+            panic!(
+                "invalid 'with' path value: `{}`",
+                nv.value.into_token_stream()
+            );
         };
 
         Some(path)
@@ -51,10 +54,9 @@ pub fn skip_attr(attrs: &[Attribute]) -> bool {
             return false;
         }
 
-        if let Ok(path) = attr.parse_args::<Path>() {
-            path.is_ident("skip")
-        } else {
-            false
+        match attr.parse_args::<Path>() {
+            Ok(path) => path.is_ident("skip"),
+            _ => false,
         }
     })
 }

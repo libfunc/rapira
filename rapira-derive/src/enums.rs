@@ -407,7 +407,7 @@ pub fn enum_serializer(
 
     let name_with_generics = build_ident(name, generics);
 
-    let gen = quote! {
+    let res = quote! {
         #name_with_generics {
             const STATIC_SIZE: Option<usize> = #static_size;
             const MIN_SIZE: usize = #min_size;
@@ -485,5 +485,5 @@ pub fn enum_serializer(
         }
     };
 
-    proc_macro::TokenStream::from(gen)
+    proc_macro::TokenStream::from(res)
 }

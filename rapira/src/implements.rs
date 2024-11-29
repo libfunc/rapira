@@ -19,11 +19,11 @@ use smallvec::SmallVec;
 #[cfg(feature = "uuid")]
 use uuid::Uuid;
 
+use crate::LEN_SIZE;
 #[cfg(feature = "smallvec")]
 use crate::max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF};
 #[cfg(feature = "indexmap")]
 use crate::max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF};
-use crate::LEN_SIZE;
 
 #[cfg(feature = "arrayvec")]
 impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
@@ -43,11 +43,9 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
         Self: Sized,
     {
         let len = u32::from_slice(slice)? as usize;
-
         for _ in 0..len {
             T::check_bytes(slice)?;
         }
-
         Ok(())
     }
 
@@ -57,18 +55,14 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
         Self: Sized,
     {
         let len = usize::from_slice(slice)?;
-
         if len > CAP {
             return Err(crate::RapiraError::SliceLen);
         }
-
         let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
-
         for _ in 0..len {
             let val = T::from_slice(slice)?;
             vec.push(val);
         }
-
         Ok(vec)
     }
 
@@ -77,22 +71,18 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
     where
         Self: Sized,
     {
-        let len = u32::from_slice_unchecked(slice)? as usize;
-
-        if len > CAP {
-            return Err(crate::RapiraError::SliceLen);
-        }
-
-        let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
-
-        for _ in 0..len {
-            let val = T::from_slice_unchecked(slice)?;
-            unsafe {
+        unsafe {
+            let len = u32::from_slice_unchecked(slice)? as usize;
+            if len > CAP {
+                return Err(crate::RapiraError::SliceLen);
+            }
+            let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
+            for _ in 0..len {
+                let val = T::from_slice_unchecked(slice)?;
                 vec.push_unchecked(val);
             }
+            Ok(vec)
         }
-
-        Ok(vec)
     }
 
     #[inline]
@@ -100,15 +90,16 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
     where
         Self: Sized,
     {
-        let len = usize::from_slice_unsafe(slice)?;
-        let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
+        unsafe {
+            let len = usize::from_slice_unsafe(slice)?;
+            let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
+            for _ in 0..len {
+                let val = T::from_slice_unsafe(slice)?;
+                vec.push_unchecked(val);
+            }
 
-        for _ in 0..len {
-            let val = T::from_slice_unsafe(slice)?;
-            vec.push_unchecked(val);
+            Ok(vec)
         }
-
-        Ok(vec)
     }
 
     #[inline]
@@ -173,7 +164,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
     where
         Self: Sized,
     {
-        let s = crate::str_rapira::from_slice_unchecked(slice)?;
+        let s = unsafe { crate::str_rapira::from_slice_unchecked(slice)? };
         let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
         Ok(s)
     }
@@ -183,7 +174,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
     where
         Self: Sized,
     {
-        let s = crate::str_rapira::from_slice_unsafe(slice)?;
+        let s = unsafe { crate::str_rapira::from_slice_unsafe(slice)? };
         let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
         Ok(s)
     }
@@ -260,7 +251,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for SmallVec<[T; CAP]> {
         let mut vec: SmallVec<[T; CAP]> = SmallVec::with_capacity(len);
 
         for _ in 0..len {
-            let val = T::from_slice_unchecked(slice)?;
+            let val = unsafe { T::from_slice_unchecked(slice)? };
             vec.push(val);
         }
 
@@ -272,15 +263,17 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for SmallVec<[T; CAP]> {
     where
         Self: Sized,
     {
-        let len = usize::from_slice_unsafe(slice)?;
-        let mut vec: SmallVec<[T; CAP]> = SmallVec::with_capacity(len);
+        unsafe {
+            let len = usize::from_slice_unsafe(slice)?;
+            let mut vec: SmallVec<[T; CAP]> = SmallVec::with_capacity(len);
 
-        for _ in 0..len {
-            let val = T::from_slice_unsafe(slice)?;
-            vec.push(val);
+            for _ in 0..len {
+                let val = T::from_slice_unsafe(slice)?;
+                vec.push(val);
+            }
+
+            Ok(vec)
         }
-
-        Ok(vec)
     }
 
     #[inline]
@@ -356,8 +349,10 @@ impl crate::Rapira for Bytes {
     {
         use crate::bytes_rapira;
 
-        let bytes = bytes_rapira::from_slice_unsafe(slice)?;
-        Ok(Bytes::copy_from_slice(bytes))
+        unsafe {
+            let bytes = bytes_rapira::from_slice_unsafe(slice)?;
+            Ok(Bytes::copy_from_slice(bytes))
+        }
     }
 }
 
@@ -411,8 +406,10 @@ impl crate::Rapira for InlineArray {
     {
         use crate::bytes_rapira;
 
-        let bytes = bytes_rapira::from_slice_unsafe(slice)?;
-        Ok(InlineArray::from(bytes))
+        unsafe {
+            let bytes = bytes_rapira::from_slice_unsafe(slice)?;
+            Ok(InlineArray::from(bytes))
+        }
     }
 }
 
@@ -499,14 +496,14 @@ pub mod zero {
     where
         T: FromBytes + Sized,
     {
-        let size = size_of::<T>();
-        let bytes: &[u8] = slice.get_unchecked(..size);
-
-        *slice = slice.get_unchecked(size..);
-
-        let t: T = FromBytes::read_from_bytes(bytes)
-            .map_err(|_| crate::RapiraError::Other("zerocopy error"))?;
-        Ok(t)
+        unsafe {
+            let size = size_of::<T>();
+            let bytes: &[u8] = slice.get_unchecked(..size);
+            *slice = slice.get_unchecked(size..);
+            let t: T = FromBytes::read_from_bytes(bytes)
+                .map_err(|_| crate::RapiraError::Other("zerocopy error"))?;
+            Ok(t)
+        }
     }
 
     #[inline]
@@ -640,48 +637,50 @@ impl crate::Rapira for Value {
     {
         use crate::byte_rapira;
 
-        let byte = byte_rapira::from_slice_unsafe(slice)?;
-        match byte {
-            0 => Ok(Value::Null),
-            1 => {
-                let b = bool::from_slice_unsafe(slice)?;
-                Ok(Value::Bool(b))
-            }
-            2 => {
-                let byte = byte_rapira::from_slice_unsafe(slice)?;
-                if byte == 0 {
-                    let u = u64::from_slice_unsafe(slice)?;
-                    Ok(Value::Number(u.into()))
-                } else if byte == 1 {
-                    let i = i64::from_slice_unsafe(slice)?;
-                    Ok(Value::Number(i.into()))
-                } else if byte == 2 {
-                    let f = f64::from_slice_unsafe(slice)?;
-                    let number = Number::from_f64(f).ok_or(crate::RapiraError::FloatIsNaN)?;
-                    Ok(Value::Number(number))
-                } else {
-                    Err(crate::RapiraError::EnumVariant)
+        unsafe {
+            let byte = byte_rapira::from_slice_unsafe(slice)?;
+            match byte {
+                0 => Ok(Value::Null),
+                1 => {
+                    let b = bool::from_slice_unsafe(slice)?;
+                    Ok(Value::Bool(b))
                 }
-            }
-            3 => {
-                let s = String::from_slice_unsafe(slice)?;
-                Ok(Value::String(s))
-            }
-            4 => {
-                let vec = Vec::<Value>::from_slice_unsafe(slice)?;
-                Ok(Value::Array(vec))
-            }
-            5 => {
-                let len = usize::from_slice_unsafe(slice)?;
-                let mut map = Map::new();
-                for _ in 0..len {
-                    let key = String::from_slice_unsafe(slice)?;
-                    let val = Value::from_slice_unsafe(slice)?;
-                    map.insert(key, val);
+                2 => {
+                    let byte = byte_rapira::from_slice_unsafe(slice)?;
+                    if byte == 0 {
+                        let u = u64::from_slice_unsafe(slice)?;
+                        Ok(Value::Number(u.into()))
+                    } else if byte == 1 {
+                        let i = i64::from_slice_unsafe(slice)?;
+                        Ok(Value::Number(i.into()))
+                    } else if byte == 2 {
+                        let f = f64::from_slice_unsafe(slice)?;
+                        let number = Number::from_f64(f).ok_or(crate::RapiraError::FloatIsNaN)?;
+                        Ok(Value::Number(number))
+                    } else {
+                        Err(crate::RapiraError::EnumVariant)
+                    }
                 }
-                Ok(Value::Object(map))
+                3 => {
+                    let s = String::from_slice_unsafe(slice)?;
+                    Ok(Value::String(s))
+                }
+                4 => {
+                    let vec = Vec::<Value>::from_slice_unsafe(slice)?;
+                    Ok(Value::Array(vec))
+                }
+                5 => {
+                    let len = usize::from_slice_unsafe(slice)?;
+                    let mut map = Map::new();
+                    for _ in 0..len {
+                        let key = String::from_slice_unsafe(slice)?;
+                        let val = Value::from_slice_unsafe(slice)?;
+                        map.insert(key, val);
+                    }
+                    Ok(Value::Object(map))
+                }
+                _ => Err(crate::RapiraError::EnumVariant),
             }
-            _ => Err(crate::RapiraError::EnumVariant),
         }
     }
 
@@ -802,8 +801,10 @@ impl crate::Rapira for Decimal {
     where
         Self: Sized,
     {
-        let bytes = <[u8; 16]>::from_slice_unsafe(slice)?;
-        Ok(Decimal::deserialize(bytes))
+        unsafe {
+            let bytes = <[u8; 16]>::from_slice_unsafe(slice)?;
+            Ok(Decimal::deserialize(bytes))
+        }
     }
 
     fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
@@ -856,18 +857,22 @@ impl crate::Rapira for CompactString {
     where
         Self: Sized,
     {
-        let s = crate::str_rapira::from_slice_unsafe(slice)?;
-        let s = CompactString::new(s);
-        Ok(s)
+        unsafe {
+            let s = crate::str_rapira::from_slice_unsafe(slice)?;
+            let s = CompactString::new(s);
+            Ok(s)
+        }
     }
 
     unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let s = crate::str_rapira::from_slice_unchecked(slice)?;
-        let s = CompactString::new(s);
-        Ok(s)
+        unsafe {
+            let s = crate::str_rapira::from_slice_unchecked(slice)?;
+            let s = CompactString::new(s);
+            Ok(s)
+        }
     }
 
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
@@ -953,9 +958,11 @@ where
         let mut map =
             IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
         for _ in 0..len {
-            let key = K::from_slice_unchecked(slice)?;
-            let value = V::from_slice_unchecked(slice)?;
-            map.insert(key, value);
+            unsafe {
+                let key = K::from_slice_unchecked(slice)?;
+                let value = V::from_slice_unchecked(slice)?;
+                map.insert(key, value);
+            }
         }
         Ok(map)
     }
@@ -965,16 +972,18 @@ where
     where
         Self: Sized,
     {
-        let len = u32::from_slice_unsafe(slice)? as usize;
-        let hasher = BuildHasherDefault::<S>::default();
-        let mut map =
-            IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
-        for _ in 0..len {
-            let key = K::from_slice_unsafe(slice)?;
-            let value = V::from_slice_unsafe(slice)?;
-            map.insert(key, value);
+        unsafe {
+            let len = u32::from_slice_unsafe(slice)? as usize;
+            let hasher = BuildHasherDefault::<S>::default();
+            let mut map =
+                IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
+            for _ in 0..len {
+                let key = K::from_slice_unsafe(slice)?;
+                let value = V::from_slice_unsafe(slice)?;
+                map.insert(key, value);
+            }
+            Ok(map)
         }
-        Ok(map)
     }
 
     #[inline]
@@ -1024,8 +1033,10 @@ impl crate::Rapira for Uuid {
     where
         Self: Sized,
     {
-        let bytes = <[u8; 16]>::from_slice_unsafe(slice)?;
-        Ok(Self::from_bytes(bytes))
+        unsafe {
+            let bytes = <[u8; 16]>::from_slice_unsafe(slice)?;
+            Ok(Self::from_bytes(bytes))
+        }
     }
 
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {

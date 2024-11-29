@@ -359,7 +359,7 @@ pub fn enum_with_primitive_serializer(
         };
     }
 
-    let gen = quote! {
+    let res = quote! {
         impl rapira::Rapira for #name {
             const STATIC_SIZE: Option<usize> = rapira::enum_size([#(#enum_sizes)*]);
             const MIN_SIZE: usize = rapira::enum_min_size(&[#(#min_sizes)*]);
@@ -442,5 +442,5 @@ pub fn enum_with_primitive_serializer(
         }
     };
 
-    proc_macro::TokenStream::from(gen)
+    proc_macro::TokenStream::from(res)
 }

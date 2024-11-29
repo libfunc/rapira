@@ -1,7 +1,7 @@
 use rapira::*;
 use zerocopy::{
-    byteorder::{LE, U64},
     FromBytes, Immutable, IntoBytes, KnownLayout,
+    byteorder::{LE, U64},
 };
 
 #[test]

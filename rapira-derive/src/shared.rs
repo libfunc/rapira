@@ -1,10 +1,10 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{
-    punctuated::Punctuated,
-    token::{Colon, Comma},
     GenericParam, Generics, Path, PathSegment, PredicateType, TraitBound, TraitBoundModifier, Type,
     TypeParam, TypeParamBound, TypePath, WherePredicate,
+    punctuated::Punctuated,
+    token::{Colon, Comma},
 };
 
 pub fn build_ident(name: &Ident, mut generics: Generics) -> TokenStream {

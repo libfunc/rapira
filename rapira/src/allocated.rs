@@ -1,7 +1,8 @@
 use crate::{
+    LEN_SIZE, Rapira, RapiraError, Result,
     max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF},
     primitive::bytes_rapira,
-    str_rapira, Rapira, RapiraError, Result, LEN_SIZE,
+    str_rapira,
 };
 
 #[cfg(feature = "std")]
@@ -44,7 +45,7 @@ impl Rapira for String {
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice_unchecked(slice)?;
+        let s = unsafe { str_rapira::from_slice_unchecked(slice)? };
         Ok(s.to_owned())
     }
 
@@ -53,7 +54,7 @@ impl Rapira for String {
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice_unsafe(slice)?;
+        let s = unsafe { str_rapira::from_slice_unsafe(slice)? };
         Ok(s.to_owned())
     }
 
@@ -99,7 +100,7 @@ impl Rapira for Vec<u8> {
     where
         Self: Sized,
     {
-        let bytes = bytes_rapira::from_slice_unsafe(slice)?;
+        let bytes = unsafe { bytes_rapira::from_slice_unsafe(slice)? };
         Ok(bytes.to_vec())
     }
 
@@ -175,7 +176,7 @@ impl<T: Rapira> Rapira for Vec<T> {
         let mut vec: Vec<T> = Vec::with_capacity(len);
 
         for _ in 0..len {
-            let val = T::from_slice_unchecked(slice)?;
+            let val = unsafe { T::from_slice_unchecked(slice)? };
             vec.push(val);
         }
 
@@ -187,11 +188,11 @@ impl<T: Rapira> Rapira for Vec<T> {
     where
         Self: Sized,
     {
-        let len = u32::from_slice_unsafe(slice)? as usize;
+        let len = unsafe { u32::from_slice_unsafe(slice)? } as usize;
         let mut vec: Vec<T> = Vec::with_capacity(len);
 
         for _ in 0..len {
-            let val = T::from_slice_unsafe(slice)?;
+            let val = unsafe { T::from_slice_unsafe(slice)? };
             vec.push(val);
         }
 
@@ -248,8 +249,10 @@ impl<T: Rapira> Rapira for Box<T> {
     where
         Self: Sized,
     {
-        let t = T::from_slice_unchecked(slice)?;
-        Ok(Box::new(t))
+        unsafe {
+            let t = T::from_slice_unchecked(slice)?;
+            Ok(Box::new(t))
+        }
     }
 
     #[inline]
@@ -257,8 +260,10 @@ impl<T: Rapira> Rapira for Box<T> {
     where
         Self: Sized,
     {
-        let t = T::from_slice_unsafe(slice)?;
-        Ok(Box::new(t))
+        unsafe {
+            let t = T::from_slice_unsafe(slice)?;
+            Ok(Box::new(t))
+        }
     }
 
     #[inline]
@@ -331,8 +336,8 @@ where
         let len = u32::from_slice(slice)? as usize;
         let mut map = BTreeMap::<K, V>::new();
         for _ in 0..len {
-            let key = K::from_slice_unchecked(slice)?;
-            let value = V::from_slice_unchecked(slice)?;
+            let key = unsafe { K::from_slice_unchecked(slice)? };
+            let value = unsafe { V::from_slice_unchecked(slice)? };
             map.insert(key, value);
         }
         Ok(map)
@@ -343,14 +348,16 @@ where
     where
         Self: Sized,
     {
-        let len = u32::from_slice_unsafe(slice)?;
-        let mut map = BTreeMap::<K, V>::new();
-        for _ in 0..len {
-            let key = K::from_slice_unsafe(slice)?;
-            let value = V::from_slice_unsafe(slice)?;
-            map.insert(key, value);
+        unsafe {
+            let len = u32::from_slice_unsafe(slice)?;
+            let mut map = BTreeMap::<K, V>::new();
+            for _ in 0..len {
+                let key = K::from_slice_unsafe(slice)?;
+                let value = V::from_slice_unsafe(slice)?;
+                map.insert(key, value);
+            }
+            Ok(map)
         }
-        Ok(map)
     }
 
     #[inline]
@@ -407,7 +414,7 @@ impl Rapira for Cow<'_, str> {
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice_unchecked(slice)?;
+        let s = unsafe { str_rapira::from_slice_unchecked(slice)? };
         let s = Cow::Owned(s.to_owned());
         Ok(s)
     }
@@ -417,9 +424,11 @@ impl Rapira for Cow<'_, str> {
     where
         Self: Sized,
     {
-        let s = str_rapira::from_slice_unsafe(slice)?;
-        let s = Cow::Owned(s.to_owned());
-        Ok(s)
+        unsafe {
+            let s = str_rapira::from_slice_unsafe(slice)?;
+            let s = Cow::Owned(s.to_owned());
+            Ok(s)
+        }
     }
 
     #[inline]
@@ -473,13 +482,15 @@ impl Rapira for IpAddr {
     where
         Self: Sized,
     {
-        let b = byte_rapira::from_slice_unsafe(slice)?;
-        if b == 0 {
-            let v4 = <[u8; 4]>::from_slice_unsafe(slice)?;
-            Ok(IpAddr::from(v4))
-        } else {
-            let v6 = Ipv6Addr::from_slice_unsafe(slice)?;
-            Ok(IpAddr::from(v6))
+        unsafe {
+            let b = byte_rapira::from_slice_unsafe(slice)?;
+            if b == 0 {
+                let v4 = <[u8; 4]>::from_slice_unsafe(slice)?;
+                Ok(IpAddr::from(v4))
+            } else {
+                let v6 = Ipv6Addr::from_slice_unsafe(slice)?;
+                Ok(IpAddr::from(v6))
+            }
         }
     }
 
@@ -551,8 +562,10 @@ impl Rapira for Ipv6Addr {
     where
         Self: Sized,
     {
-        let v6 = <[u8; 16]>::from_slice_unsafe(slice)?;
-        Ok(Ipv6Addr::from(v6))
+        unsafe {
+            let v6 = <[u8; 16]>::from_slice_unsafe(slice)?;
+            Ok(Ipv6Addr::from(v6))
+        }
     }
 
     #[inline]
@@ -602,9 +615,11 @@ impl Rapira for SocketAddrV6 {
     where
         Self: Sized,
     {
-        let ip = Ipv6Addr::from_slice_unsafe(slice)?;
-        let port = u16::from_slice_unsafe(slice)?;
-        Ok(SocketAddrV6::new(ip, port, 0, 0))
+        unsafe {
+            let ip = Ipv6Addr::from_slice_unsafe(slice)?;
+            let port = u16::from_slice_unsafe(slice)?;
+            Ok(SocketAddrV6::new(ip, port, 0, 0))
+        }
     }
 
     #[inline]

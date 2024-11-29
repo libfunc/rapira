@@ -16,7 +16,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use simple_enum::simple_enum_serializer;
 use structs::struct_serializer;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Ident};
+use syn::{Data, DeriveInput, Fields, Ident, parse_macro_input};
 
 /// available attributes:
 /// - `#[primitive(PrimitiveName)]` - set primitive enum for complex enum
@@ -53,7 +53,9 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
         }
         Data::Union(_) => {
-            panic!("unions not supported, but Rust enums is implemented Rapira trait (use Enums instead)");
+            panic!(
+                "unions not supported, but Rust enums is implemented Rapira trait (use Enums instead)"
+            );
         }
     }
 }
@@ -129,7 +131,7 @@ pub fn derive_primitive_from_enum(stream: proc_macro::TokenStream) -> proc_macro
                     };
                 }
 
-                let gen = quote! {
+                let res = quote! {
                     impl From<&#name> for #primitive_name {
                         #[inline]
                         fn from(value: &#name) -> Self {
@@ -140,7 +142,7 @@ pub fn derive_primitive_from_enum(stream: proc_macro::TokenStream) -> proc_macro
                     }
                 };
 
-                proc_macro::TokenStream::from(gen)
+                proc_macro::TokenStream::from(res)
             }
         }
         _ => {
@@ -175,7 +177,7 @@ pub fn derive_from_u8(stream: proc_macro::TokenStream) -> proc_macro::TokenStrea
                     });
                 }
 
-                let gen = quote! {
+                let r#gen = quote! {
                     impl PartialEq<u8> for #name {
                         fn eq(&self, other: &u8) -> bool {
                             *self as u8 == *other
@@ -208,7 +210,7 @@ pub fn derive_from_u8(stream: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         }
                     }
                 };
-                proc_macro::TokenStream::from(gen)
+                proc_macro::TokenStream::from(r#gen)
             } else {
                 panic!("FromU8 only for simple enum allow (without nested data)");
             }

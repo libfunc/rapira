@@ -127,7 +127,7 @@ pub fn struct_serializer(
 
             let name_with_generics = build_ident(name, generics);
 
-            let gen = quote! {
+            let res = quote! {
                 #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
                     const MIN_SIZE: usize = rapira::min_size(&[#(#min_size)*]);
@@ -191,7 +191,7 @@ pub fn struct_serializer(
                     }
                 }
             };
-            proc_macro::TokenStream::from(gen)
+            proc_macro::TokenStream::from(res)
         }
         Fields::Unnamed(fields) => {
             let unnamed = &fields.unnamed;
@@ -284,7 +284,7 @@ pub fn struct_serializer(
 
             let name_with_generics = build_ident(name, generics);
 
-            let gen = quote! {
+            let res = quote! {
                 #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
                     const MIN_SIZE: usize = rapira::min_size(&[#(#min_size)*]);
@@ -341,7 +341,7 @@ pub fn struct_serializer(
                 }
             };
 
-            proc_macro::TokenStream::from(gen)
+            proc_macro::TokenStream::from(res)
         }
         Fields::Unit => proc_macro::TokenStream::from(quote! {
             impl rapira::Rapira for #name {

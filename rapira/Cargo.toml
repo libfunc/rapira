@@ -10,7 +10,7 @@ homepage = "https://github.com/libfunc/rapira/"
 documentation = "https://docs.rs/rapira/"
 repository = "https://github.com/libfunc/rapira/"
 readme = "../README.md"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "rapira"

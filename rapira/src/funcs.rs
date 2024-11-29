@@ -64,7 +64,7 @@ pub unsafe fn deser_unchecked<T>(mut bytes: &[u8]) -> Result<T>
 where
     T: Rapira + Sized,
 {
-    T::from_slice_unchecked(&mut bytes)
+    unsafe { T::from_slice_unchecked(&mut bytes) }
 }
 
 /// # Safety
@@ -80,5 +80,5 @@ pub unsafe fn deser_unsafe<T>(mut bytes: &[u8]) -> Result<T>
 where
     T: Rapira + Sized,
 {
-    T::from_slice_unsafe(&mut bytes)
+    unsafe { T::from_slice_unsafe(&mut bytes) }
 }
