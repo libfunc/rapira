@@ -1,39 +1,14 @@
-#[cfg(feature = "arrayvec")]
-use arrayvec::{ArrayString, ArrayVec};
-#[cfg(feature = "bytes")]
-use bytes::Bytes;
-#[cfg(feature = "compact_str")]
-use compact_str::CompactString;
-#[cfg(feature = "indexmap")]
-use core::hash::BuildHasherDefault;
-#[cfg(feature = "indexmap")]
-use indexmap::IndexMap;
-#[cfg(feature = "inline-array")]
-use inline_array::InlineArray;
-#[cfg(feature = "rust_decimal")]
-use rust_decimal::Decimal;
-#[cfg(feature = "serde_json")]
-use serde_json::{Map, Number, Value};
-#[cfg(feature = "smallvec")]
-use smallvec::SmallVec;
-#[cfg(feature = "uuid")]
-use uuid::Uuid;
-
 use crate::LEN_SIZE;
-#[cfg(feature = "smallvec")]
-use crate::max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF};
-#[cfg(feature = "indexmap")]
-use crate::max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF};
 
 #[cfg(feature = "arrayvec")]
-impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
+impl<T: crate::Rapira, const CAP: usize> crate::Rapira for arrayvec::ArrayVec<T, CAP> {
     const MIN_SIZE: usize = LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
-        match T::STATIC_SIZE {
-            Some(size) => 4 + (size * self.len()),
-            None => 4 + self.iter().fold(0, |b, v| b + v.size()),
+        4 + match T::STATIC_SIZE {
+            Some(size) => size * self.len(),
+            None => self.iter().fold(0, |b, v| b + v.size()),
         }
     }
 
@@ -58,7 +33,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
         if len > CAP {
             return Err(crate::RapiraError::SliceLen);
         }
-        let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
+        let mut vec = Self::new_const();
         for _ in 0..len {
             let val = T::from_slice(slice)?;
             vec.push(val);
@@ -76,7 +51,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
             if len > CAP {
                 return Err(crate::RapiraError::SliceLen);
             }
-            let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
+            let mut vec = Self::new_const();
             for _ in 0..len {
                 let val = T::from_slice_unchecked(slice)?;
                 vec.push_unchecked(val);
@@ -92,7 +67,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
     {
         unsafe {
             let len = usize::from_slice_unsafe(slice)?;
-            let mut vec: ArrayVec<T, CAP> = ArrayVec::new_const();
+            let mut vec = Self::new_const();
             for _ in 0..len {
                 let val = T::from_slice_unsafe(slice)?;
                 vec.push_unchecked(val);
@@ -126,7 +101,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for ArrayVec<T, CAP> {
 }
 
 #[cfg(feature = "arrayvec")]
-impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
+impl<const CAP: usize> crate::Rapira for arrayvec::ArrayString<CAP> {
     const MIN_SIZE: usize = LEN_SIZE;
 
     #[inline]
@@ -155,7 +130,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
         Self: Sized,
     {
         let s = crate::str_rapira::from_slice(slice)?;
-        let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
+        let s = Self::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
         Ok(s)
     }
 
@@ -165,7 +140,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
         Self: Sized,
     {
         let s = unsafe { crate::str_rapira::from_slice_unchecked(slice)? };
-        let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
+        let s = Self::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
         Ok(s)
     }
 
@@ -175,7 +150,7 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
         Self: Sized,
     {
         let s = unsafe { crate::str_rapira::from_slice_unsafe(slice)? };
-        let s = ArrayString::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
+        let s = Self::from(s).map_err(|_| crate::RapiraError::SliceLen)?;
         Ok(s)
     }
 
@@ -190,14 +165,14 @@ impl<const CAP: usize> crate::Rapira for ArrayString<CAP> {
 }
 
 #[cfg(feature = "smallvec")]
-impl<T: crate::Rapira, const CAP: usize> crate::Rapira for SmallVec<[T; CAP]> {
+impl<T: crate::Rapira, const CAP: usize> crate::Rapira for smallvec::SmallVec<[T; CAP]> {
     const MIN_SIZE: usize = LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
-        match T::STATIC_SIZE {
-            Some(size) => 4 + (size * self.len()),
-            None => 4 + self.iter().fold(0, |b, v| b + v.size()),
+        4 + match T::STATIC_SIZE {
+            Some(size) => size * self.len(),
+            None => self.iter().fold(0, |b, v| b + v.size()),
         }
     }
 
@@ -220,19 +195,21 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for SmallVec<[T; CAP]> {
     where
         Self: Sized,
     {
+        use crate::max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF};
+
         let len = u32::from_slice(slice)? as usize;
 
         if len > SMALLVEC_MAX_CAP {
             return Err(crate::RapiraError::MaxCapacity);
         }
 
-        let size = std::mem::size_of::<SmallVec<[T; CAP]>>() * len;
+        let size = std::mem::size_of::<Self>() * len;
 
         if size > SMALLVEC_MAX_SIZE_OF {
             return Err(crate::RapiraError::MaxSize);
         }
 
-        let mut vec: SmallVec<[T; CAP]> = SmallVec::with_capacity(len);
+        let mut vec = Self::with_capacity(len);
 
         for _ in 0..len {
             let val = T::from_slice(slice)?;
@@ -248,7 +225,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for SmallVec<[T; CAP]> {
         Self: Sized,
     {
         let len = u32::from_slice(slice)? as usize;
-        let mut vec: SmallVec<[T; CAP]> = SmallVec::with_capacity(len);
+        let mut vec = Self::with_capacity(len);
 
         for _ in 0..len {
             let val = unsafe { T::from_slice_unchecked(slice)? };
@@ -265,7 +242,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for SmallVec<[T; CAP]> {
     {
         unsafe {
             let len = usize::from_slice_unsafe(slice)?;
-            let mut vec: SmallVec<[T; CAP]> = SmallVec::with_capacity(len);
+            let mut vec = Self::with_capacity(len);
 
             for _ in 0..len {
                 let val = T::from_slice_unsafe(slice)?;
@@ -300,7 +277,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for SmallVec<[T; CAP]> {
 }
 
 #[cfg(feature = "bytes")]
-impl crate::Rapira for Bytes {
+impl crate::Rapira for bytes::Bytes {
     const MIN_SIZE: usize = LEN_SIZE;
 
     #[inline]
@@ -339,7 +316,7 @@ impl crate::Rapira for Bytes {
         use crate::bytes_rapira;
 
         let bytes = bytes_rapira::from_slice(slice)?;
-        Ok(Bytes::copy_from_slice(bytes))
+        Ok(Self::copy_from_slice(bytes))
     }
 
     #[inline]
@@ -351,13 +328,13 @@ impl crate::Rapira for Bytes {
 
         unsafe {
             let bytes = bytes_rapira::from_slice_unsafe(slice)?;
-            Ok(Bytes::copy_from_slice(bytes))
+            Ok(Self::copy_from_slice(bytes))
         }
     }
 }
 
 #[cfg(feature = "inline-array")]
-impl crate::Rapira for InlineArray {
+impl crate::Rapira for inline_array::InlineArray {
     const MIN_SIZE: usize = LEN_SIZE;
 
     #[inline]
@@ -396,7 +373,7 @@ impl crate::Rapira for InlineArray {
         use crate::bytes_rapira;
 
         let bytes = bytes_rapira::from_slice(slice)?;
-        Ok(InlineArray::from(bytes))
+        Ok(Self::from(bytes))
     }
 
     #[inline]
@@ -408,7 +385,7 @@ impl crate::Rapira for InlineArray {
 
         unsafe {
             let bytes = bytes_rapira::from_slice_unsafe(slice)?;
-            Ok(InlineArray::from(bytes))
+            Ok(Self::from(bytes))
         }
     }
 }
@@ -531,7 +508,7 @@ pub mod zero {
 }
 
 #[cfg(feature = "serde_json")]
-impl crate::Rapira for Value {
+impl crate::Rapira for serde_json::Value {
     const MIN_SIZE: usize = 1;
 
     #[inline]
@@ -540,6 +517,7 @@ impl crate::Rapira for Value {
         Self: Sized,
     {
         use crate::byte_rapira;
+        use serde_json::{Map, Number, Value};
 
         let byte = byte_rapira::from_slice(slice)?;
         match byte {
@@ -615,13 +593,13 @@ impl crate::Rapira for Value {
                 String::check_bytes(slice)?;
             }
             4 => {
-                Vec::<Value>::check_bytes(slice)?;
+                Vec::<Self>::check_bytes(slice)?;
             }
             5 => {
                 let len = u32::from_slice(slice)? as usize;
                 for _ in 0..len {
                     String::check_bytes(slice)?;
-                    Value::check_bytes(slice)?;
+                    Self::check_bytes(slice)?;
                 }
             }
             _ => return Err(crate::RapiraError::EnumVariant),
@@ -636,48 +614,49 @@ impl crate::Rapira for Value {
         Self: Sized,
     {
         use crate::byte_rapira;
+        use serde_json::{Map, Number};
 
         unsafe {
             let byte = byte_rapira::from_slice_unsafe(slice)?;
             match byte {
-                0 => Ok(Value::Null),
+                0 => Ok(Self::Null),
                 1 => {
                     let b = bool::from_slice_unsafe(slice)?;
-                    Ok(Value::Bool(b))
+                    Ok(Self::Bool(b))
                 }
                 2 => {
                     let byte = byte_rapira::from_slice_unsafe(slice)?;
                     if byte == 0 {
                         let u = u64::from_slice_unsafe(slice)?;
-                        Ok(Value::Number(u.into()))
+                        Ok(Self::Number(u.into()))
                     } else if byte == 1 {
                         let i = i64::from_slice_unsafe(slice)?;
-                        Ok(Value::Number(i.into()))
+                        Ok(Self::Number(i.into()))
                     } else if byte == 2 {
                         let f = f64::from_slice_unsafe(slice)?;
                         let number = Number::from_f64(f).ok_or(crate::RapiraError::FloatIsNaN)?;
-                        Ok(Value::Number(number))
+                        Ok(Self::Number(number))
                     } else {
                         Err(crate::RapiraError::EnumVariant)
                     }
                 }
                 3 => {
                     let s = String::from_slice_unsafe(slice)?;
-                    Ok(Value::String(s))
+                    Ok(Self::String(s))
                 }
                 4 => {
-                    let vec = Vec::<Value>::from_slice_unsafe(slice)?;
-                    Ok(Value::Array(vec))
+                    let vec = Vec::<Self>::from_slice_unsafe(slice)?;
+                    Ok(Self::Array(vec))
                 }
                 5 => {
                     let len = usize::from_slice_unsafe(slice)?;
                     let mut map = Map::new();
                     for _ in 0..len {
                         let key = String::from_slice_unsafe(slice)?;
-                        let val = Value::from_slice_unsafe(slice)?;
+                        let val = Self::from_slice_unsafe(slice)?;
                         map.insert(key, val);
                     }
-                    Ok(Value::Object(map))
+                    Ok(Self::Object(map))
                 }
                 _ => Err(crate::RapiraError::EnumVariant),
             }
@@ -689,14 +668,14 @@ impl crate::Rapira for Value {
         use crate::push;
 
         match self {
-            Value::Null => {
+            Self::Null => {
                 push(slice, cursor, 0);
             }
-            Value::Bool(v) => {
+            Self::Bool(v) => {
                 push(slice, cursor, 1);
                 v.convert_to_bytes(slice, cursor);
             }
-            Value::Number(n) => {
+            Self::Number(n) => {
                 push(slice, cursor, 2);
                 if let Some(u) = n.as_u64() {
                     push(slice, cursor, 0);
@@ -709,15 +688,15 @@ impl crate::Rapira for Value {
                     f.convert_to_bytes(slice, cursor);
                 }
             }
-            Value::String(s) => {
+            Self::String(s) => {
                 push(slice, cursor, 3);
                 s.convert_to_bytes(slice, cursor);
             }
-            Value::Array(a) => {
+            Self::Array(a) => {
                 push(slice, cursor, 4);
                 a.convert_to_bytes(slice, cursor);
             }
-            Value::Object(o) => {
+            Self::Object(o) => {
                 push(slice, cursor, 5);
                 let size: u32 = o.len() as u32;
                 size.convert_to_bytes(slice, cursor);
@@ -734,14 +713,14 @@ impl crate::Rapira for Value {
         use crate::try_push;
 
         match self {
-            Value::Null => {
+            Self::Null => {
                 try_push(slice, cursor, 0)?;
             }
-            Value::Bool(v) => {
+            Self::Bool(v) => {
                 try_push(slice, cursor, 1)?;
                 v.convert_to_bytes(slice, cursor);
             }
-            Value::Number(n) => {
+            Self::Number(n) => {
                 try_push(slice, cursor, 2)?;
                 if let Some(u) = n.as_u64() {
                     try_push(slice, cursor, 0)?;
@@ -754,15 +733,15 @@ impl crate::Rapira for Value {
                     f.try_convert_to_bytes(slice, cursor)?;
                 }
             }
-            Value::String(s) => {
+            Self::String(s) => {
                 try_push(slice, cursor, 3)?;
                 s.try_convert_to_bytes(slice, cursor)?;
             }
-            Value::Array(a) => {
+            Self::Array(a) => {
                 try_push(slice, cursor, 4)?;
                 a.try_convert_to_bytes(slice, cursor)?;
             }
-            Value::Object(o) => {
+            Self::Object(o) => {
                 try_push(slice, cursor, 5)?;
                 let size: u32 = o.len() as u32;
                 size.try_convert_to_bytes(slice, cursor)?;
@@ -778,12 +757,12 @@ impl crate::Rapira for Value {
     #[inline]
     fn size(&self) -> usize {
         1 + match self {
-            Value::Null => 0,
-            Value::Bool(_) => 1,
-            Value::Number(_) => 1 + 8,
-            Value::String(s) => s.size(),
-            Value::Array(vec) => 4 + vec.iter().fold(0, |acc, item| acc + item.size()),
-            Value::Object(v) => {
+            Self::Null => 0,
+            Self::Bool(_) => 1,
+            Self::Number(_) => 1 + 8,
+            Self::String(s) => s.size(),
+            Self::Array(vec) => 4 + vec.iter().fold(0, |acc, item| acc + item.size()),
+            Self::Object(v) => {
                 4 + v
                     .iter()
                     .fold(0, |acc, item| acc + item.0.size() + item.1.size())
@@ -793,7 +772,7 @@ impl crate::Rapira for Value {
 }
 
 #[cfg(feature = "rust_decimal")]
-impl crate::Rapira for Decimal {
+impl crate::Rapira for rust_decimal::Decimal {
     const STATIC_SIZE: Option<usize> = Some(16);
     const MIN_SIZE: usize = 16;
 
@@ -803,7 +782,7 @@ impl crate::Rapira for Decimal {
     {
         unsafe {
             let bytes = <[u8; 16]>::from_slice_unsafe(slice)?;
-            Ok(Decimal::deserialize(bytes))
+            Ok(Self::deserialize(bytes))
         }
     }
 
@@ -812,7 +791,7 @@ impl crate::Rapira for Decimal {
         Self: Sized,
     {
         let bytes = <[u8; 16]>::from_slice(slice)?;
-        Ok(Decimal::deserialize(bytes))
+        Ok(Self::deserialize(bytes))
     }
 
     fn check_bytes(_: &mut &[u8]) -> crate::Result<()> {
@@ -833,7 +812,7 @@ impl crate::Rapira for Decimal {
 }
 
 #[cfg(feature = "compact_str")]
-impl crate::Rapira for CompactString {
+impl crate::Rapira for compact_str::CompactString {
     const MIN_SIZE: usize = LEN_SIZE;
 
     fn size(&self) -> usize {
@@ -849,7 +828,7 @@ impl crate::Rapira for CompactString {
         Self: Sized,
     {
         let s = crate::str_rapira::from_slice(slice)?;
-        let s = CompactString::new(s);
+        let s = Self::new(s);
         Ok(s)
     }
 
@@ -859,7 +838,7 @@ impl crate::Rapira for CompactString {
     {
         unsafe {
             let s = crate::str_rapira::from_slice_unsafe(slice)?;
-            let s = CompactString::new(s);
+            let s = Self::new(s);
             Ok(s)
         }
     }
@@ -870,7 +849,7 @@ impl crate::Rapira for CompactString {
     {
         unsafe {
             let s = crate::str_rapira::from_slice_unchecked(slice)?;
-            let s = CompactString::new(s);
+            let s = Self::new(s);
             Ok(s)
         }
     }
@@ -884,8 +863,178 @@ impl crate::Rapira for CompactString {
     }
 }
 
+#[cfg(feature = "ecow")]
+impl crate::Rapira for ecow::EcoString {
+    const MIN_SIZE: usize = LEN_SIZE;
+
+    fn size(&self) -> usize {
+        4 + self.len()
+    }
+
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        crate::str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
+    }
+
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = crate::str_rapira::from_slice(slice)?;
+        let s = Self::from(s);
+        Ok(s)
+    }
+
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let s = crate::str_rapira::from_slice_unsafe(slice)?;
+            let s = Self::from(s);
+            Ok(s)
+        }
+    }
+
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let s = crate::str_rapira::from_slice_unchecked(slice)?;
+            let s = Self::from(s);
+            Ok(s)
+        }
+    }
+
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        crate::str_rapira::convert_to_bytes(self, slice, cursor);
+    }
+
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
+        crate::str_rapira::try_convert_to_bytes(self, slice, cursor)
+    }
+}
+
+#[cfg(feature = "ecow")]
+impl<T> crate::Rapira for ecow::EcoVec<T>
+where
+    T: crate::Rapira + Clone,
+{
+    const MIN_SIZE: usize = LEN_SIZE;
+
+    #[inline]
+    fn size(&self) -> usize {
+        4 + match T::STATIC_SIZE {
+            Some(size) => size * self.len(),
+            None => self.iter().fold(0, |b, v| b + v.size()),
+        }
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+
+        for _ in 0..len {
+            T::check_bytes(slice)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF};
+
+        let len = u32::from_slice(slice)? as usize;
+
+        if len > SMALLVEC_MAX_CAP {
+            return Err(crate::RapiraError::MaxCapacity);
+        }
+
+        let size = std::mem::size_of::<Self>() * len;
+
+        if size > SMALLVEC_MAX_SIZE_OF {
+            return Err(crate::RapiraError::MaxSize);
+        }
+
+        let mut vec = Self::with_capacity(len);
+
+        for _ in 0..len {
+            let val = T::from_slice(slice)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+        let mut vec = Self::with_capacity(len);
+
+        for _ in 0..len {
+            let val = unsafe { T::from_slice_unchecked(slice)? };
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let len = usize::from_slice_unsafe(slice)?;
+            let mut vec = Self::with_capacity(len);
+
+            let iter = core::iter::repeat_with(|| T::from_slice_unsafe(slice)).take(len);
+
+            for item in iter {
+                let val = item?;
+                vec.push(val);
+            }
+
+            Ok(vec)
+        }
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
+        let len = self.len() as u32;
+        len.try_convert_to_bytes(slice, cursor)?;
+
+        for val in self.iter() {
+            val.try_convert_to_bytes(slice, cursor)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let len = self.len() as u32;
+        len.convert_to_bytes(slice, cursor);
+
+        for val in self.iter() {
+            val.convert_to_bytes(slice, cursor);
+        }
+    }
+}
+
 #[cfg(feature = "indexmap")]
-impl<K: crate::Rapira, V: crate::Rapira, S> crate::Rapira for IndexMap<K, V, BuildHasherDefault<S>>
+impl<K: crate::Rapira, V: crate::Rapira, S> crate::Rapira
+    for indexmap::IndexMap<K, V, core::hash::BuildHasherDefault<S>>
 where
     K: Eq + core::hash::Hash,
     S: core::hash::Hasher + core::default::Default,
@@ -925,21 +1074,21 @@ where
     where
         Self: Sized,
     {
+        use crate::max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF};
+
         let len = u32::from_slice(slice)? as usize;
 
         if len > VEC_MAX_CAP {
             return Err(crate::RapiraError::MaxCapacity);
         }
 
-        let size = std::mem::size_of::<IndexMap<K, V, BuildHasherDefault<S>>>() * len;
+        let size = std::mem::size_of::<Self>() * len;
 
         if size > VEC_MAX_SIZE_OF {
             return Err(crate::RapiraError::MaxSize);
         }
 
-        let hasher = BuildHasherDefault::<S>::default();
-        let mut map =
-            IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
+        let mut map = Self::with_capacity_and_hasher(len, Default::default());
         for _ in 0..len {
             let key = K::from_slice(slice)?;
             let value = V::from_slice(slice)?;
@@ -954,9 +1103,7 @@ where
         Self: Sized,
     {
         let len = u32::from_slice(slice)? as usize;
-        let hasher = BuildHasherDefault::<S>::default();
-        let mut map =
-            IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
+        let mut map = Self::with_capacity_and_hasher(len, Default::default());
         for _ in 0..len {
             unsafe {
                 let key = K::from_slice_unchecked(slice)?;
@@ -974,9 +1121,7 @@ where
     {
         unsafe {
             let len = u32::from_slice_unsafe(slice)? as usize;
-            let hasher = BuildHasherDefault::<S>::default();
-            let mut map =
-                IndexMap::<K, V, BuildHasherDefault<S>>::with_capacity_and_hasher(len, hasher);
+            let mut map = Self::with_capacity_and_hasher(len, Default::default());
             for _ in 0..len {
                 let key = K::from_slice_unsafe(slice)?;
                 let value = V::from_slice_unsafe(slice)?;
@@ -1009,7 +1154,7 @@ where
 }
 
 #[cfg(feature = "uuid")]
-impl crate::Rapira for Uuid {
+impl crate::Rapira for uuid::Uuid {
     const STATIC_SIZE: Option<usize> = Some(16);
     const MIN_SIZE: usize = 16;
 
