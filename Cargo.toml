@@ -1,6 +1,6 @@
 [workspace]
 members = ["rapira", "rapira-derive"]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 authors = ["Rail Khusnutdinov <rail@33.run>"]

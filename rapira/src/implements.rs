@@ -440,7 +440,7 @@ pub mod zero {
         let size = size_of::<T>();
         let bytes: &[u8] = slice.get(..size).ok_or(crate::RapiraError::SliceLen)?;
 
-        *slice = slice.get(size..).unwrap();
+        *slice = slice.get(size..).ok_or(crate::RapiraError::SliceLen)?;
 
         let t: T = FromBytes::read_from_bytes(bytes)
             .map_err(|_| crate::RapiraError::Other("zerocopy error"))?;
