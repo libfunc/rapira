@@ -333,6 +333,177 @@ impl crate::Rapira for bytes::Bytes {
     }
 }
 
+#[cfg(feature = "byteview")]
+impl crate::Rapira for byteview::StrView {
+    const MIN_SIZE: usize = LEN_SIZE;
+
+    #[inline]
+    fn size(&self) -> usize {
+        use crate::str_rapira;
+
+        str_rapira::size(self)
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        use crate::str_rapira;
+
+        str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        use crate::str_rapira;
+
+        str_rapira::convert_to_bytes(self, slice, cursor);
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
+        use crate::str_rapira;
+
+        str_rapira::try_convert_to_bytes(self, slice, cursor)
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::str_rapira;
+
+        let bytes = str_rapira::from_slice(slice)?;
+        Ok(Self::from(bytes))
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::str_rapira;
+
+        unsafe {
+            let bytes = str_rapira::from_slice_unsafe(slice)?;
+            Ok(Self::from(bytes))
+        }
+    }
+}
+
+#[cfg(feature = "byteview")]
+impl crate::Rapira for byteview::ByteView {
+    const MIN_SIZE: usize = LEN_SIZE;
+
+    #[inline]
+    fn size(&self) -> usize {
+        use crate::bytes_rapira;
+
+        bytes_rapira::size(self)
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        use crate::bytes_rapira;
+
+        bytes_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        use crate::bytes_rapira;
+
+        bytes_rapira::convert_to_bytes(self, slice, cursor);
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
+        use crate::bytes_rapira;
+
+        bytes_rapira::try_convert_to_bytes(self, slice, cursor)
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::bytes_rapira;
+
+        let bytes = bytes_rapira::from_slice(slice)?;
+        Ok(Self::from(bytes))
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::bytes_rapira;
+
+        unsafe {
+            let bytes = bytes_rapira::from_slice_unsafe(slice)?;
+            Ok(Self::from(bytes))
+        }
+    }
+}
+
+#[cfg(feature = "fjall")]
+impl crate::Rapira for fjall::Slice {
+    const MIN_SIZE: usize = LEN_SIZE;
+
+    #[inline]
+    fn size(&self) -> usize {
+        use crate::bytes_rapira;
+
+        bytes_rapira::size(self)
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        use crate::bytes_rapira;
+
+        bytes_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        use crate::bytes_rapira;
+
+        bytes_rapira::convert_to_bytes(self, slice, cursor);
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
+        use crate::bytes_rapira;
+
+        bytes_rapira::try_convert_to_bytes(self, slice, cursor)
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::bytes_rapira;
+
+        let bytes = bytes_rapira::from_slice(slice)?;
+        Ok(Self::from(bytes))
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::bytes_rapira;
+
+        unsafe {
+            let bytes = bytes_rapira::from_slice_unsafe(slice)?;
+            Ok(Self::from(bytes))
+        }
+    }
+}
+
 #[cfg(feature = "inline-array")]
 impl crate::Rapira for inline_array::InlineArray {
     const MIN_SIZE: usize = LEN_SIZE;
@@ -394,9 +565,9 @@ impl crate::Rapira for inline_array::InlineArray {
 pub mod zero {
     use core::{marker::PhantomData, mem::size_of};
 
-    use crate::{extend, try_extend};
-
     use zerocopy::{FromBytes, Immutable, IntoBytes};
+
+    use crate::{extend, try_extend};
 
     pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize>
     where
@@ -516,8 +687,9 @@ impl crate::Rapira for serde_json::Value {
     where
         Self: Sized,
     {
-        use crate::byte_rapira;
         use serde_json::{Map, Number, Value};
+
+        use crate::byte_rapira;
 
         let byte = byte_rapira::from_slice(slice)?;
         match byte {
@@ -613,8 +785,9 @@ impl crate::Rapira for serde_json::Value {
     where
         Self: Sized,
     {
-        use crate::byte_rapira;
         use serde_json::{Map, Number};
+
+        use crate::byte_rapira;
 
         unsafe {
             let byte = byte_rapira::from_slice_unsafe(slice)?;
