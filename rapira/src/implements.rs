@@ -1,4 +1,4 @@
-use crate::LEN_SIZE;
+use crate::{LEN_SIZE, Rapira};
 
 #[cfg(feature = "arrayvec")]
 impl<T: crate::Rapira, const CAP: usize> crate::Rapira for arrayvec::ArrayVec<T, CAP> {
@@ -1365,5 +1365,33 @@ impl crate::Rapira for uuid::Uuid {
     fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
         let bytes = self.as_bytes();
         bytes.try_convert_to_bytes(slice, cursor)
+    }
+}
+
+#[cfg(feature = "time")]
+impl Rapira for time::Date {
+    const STATIC_SIZE: Option<usize> = Some(4);
+    const MIN_SIZE: usize = 4;
+
+    fn size(&self) -> usize {
+        4
+    }
+
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        let val = i32::from_slice(slice)?;
+        Self::from_julian_day(val).map_err(|_| crate::RapiraError::Datetime)?;
+        Ok(())
+    }
+
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let julian_day = i32::from_slice(slice)?;
+        Self::from_julian_day(julian_day).map_err(|_| crate::RapiraError::Datetime)
+    }
+
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.to_julian_day().convert_to_bytes(slice, cursor);
     }
 }

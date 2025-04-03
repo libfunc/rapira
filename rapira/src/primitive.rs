@@ -1,8 +1,10 @@
-use crate::{Rapira, RapiraError, Result, push, static_size, try_push};
 use core::{
     mem::{MaybeUninit, size_of, transmute_copy},
     num::{NonZeroU32, NonZeroU64},
+    time::Duration,
 };
+
+use crate::{Rapira, RapiraError, Result, push, static_size, try_push};
 
 impl Rapira for () {
     const STATIC_SIZE: Option<usize> = Some(0);
@@ -1208,9 +1210,8 @@ pub mod str_rapira {
 
     use simdutf8::basic::from_utf8;
 
-    use crate::{LEN_SIZE, extend, try_extend};
-
     use super::*;
+    use crate::{LEN_SIZE, extend, try_extend};
 
     pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize> {
         None
@@ -1300,9 +1301,8 @@ pub mod str_rapira {
 pub mod bytes_rapira {
     use core::marker::PhantomData;
 
-    use crate::{LEN_SIZE, extend, try_extend};
-
     use super::*;
+    use crate::{LEN_SIZE, extend, try_extend};
 
     pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize> {
         None
@@ -1372,5 +1372,53 @@ pub mod bytes_rapira {
         len.try_convert_to_bytes(slice, cursor)?;
         try_extend(slice, cursor, item)?;
         Ok(())
+    }
+}
+
+/// saved as seconds only (no nanoseconds stored)
+impl Rapira for Duration {
+    const STATIC_SIZE: Option<usize> = Some(8);
+    const MIN_SIZE: usize = 8;
+
+    #[inline]
+    fn size(&self) -> usize {
+        8
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()> {
+        u64::check_bytes(slice)
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let secs = u64::from_slice(slice)?;
+        Ok(Duration::from_secs(secs))
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let secs = u64::from_slice_unsafe(slice)?;
+            Ok(Duration::from_secs(secs))
+        }
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let secs = self.as_secs();
+        secs.convert_to_bytes(slice, cursor);
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        let secs = self.as_secs();
+        secs.try_convert_to_bytes(slice, cursor)
     }
 }
