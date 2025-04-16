@@ -663,10 +663,7 @@ impl Rapira for f64 {
 }
 
 impl<T: Rapira> Rapira for Option<T> {
-    const STATIC_SIZE: Option<usize> = match T::STATIC_SIZE {
-        Some(s) => Some(s + 1),
-        None => None,
-    };
+    const STATIC_SIZE: Option<usize> = None;
     const MIN_SIZE: usize = T::MIN_SIZE + 1;
 
     #[inline]
