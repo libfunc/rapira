@@ -1396,7 +1396,7 @@ impl Rapira for time::Date {
     }
 }
 
-#[cfg(feature = "solana-pubkey")]
+#[cfg(feature = "solana")]
 impl Rapira for solana_pubkey::Pubkey {
     const STATIC_SIZE: Option<usize> = Some(32);
     const MIN_SIZE: usize = 32;
@@ -1419,5 +1419,33 @@ impl Rapira for solana_pubkey::Pubkey {
 
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
         self.as_array().convert_to_bytes(slice, cursor);
+    }
+}
+
+#[cfg(feature = "solana")]
+impl Rapira for solana_signature::Signature {
+    const STATIC_SIZE: Option<usize> = Some(64);
+    const MIN_SIZE: usize = 64;
+
+    fn size(&self) -> usize {
+        64
+    }
+
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        <[u8; 64]>::check_bytes(slice)
+    }
+
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let bytes = <[u8; 64]>::from_slice(slice)?;
+        Ok(Self::from(bytes))
+    }
+
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        let end = *cursor + 64;
+        slice[*cursor..end].copy_from_slice(self.as_ref());
+        *cursor = end;
     }
 }

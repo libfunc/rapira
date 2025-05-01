@@ -674,7 +674,7 @@ dependencies = [
 
 [[package]]
 name = "rapira"
-version = "0.11.7"
+version = "0.11.8"
 dependencies = [
  "arrayvec",
  "bytes",
@@ -690,6 +690,7 @@ dependencies = [
  "simdutf8",
  "smallvec",
  "solana-pubkey",
+ "solana-signature",
  "thiserror",
  "time",
  "uuid",
@@ -943,6 +944,16 @@ dependencies = [
  "sha2",
  "solana-define-syscall",
  "solana-hash",
+]
+
+[[package]]
+name = "solana-signature"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d251c8f3dc015f320b4161daac7f108156c837428e5a8cc61136d25beb11d6"
+dependencies = [
+ "bs58",
+ "solana-sanitize",
 ]
 
 [[package]]
