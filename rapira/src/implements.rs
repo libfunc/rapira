@@ -1395,3 +1395,29 @@ impl Rapira for time::Date {
         self.to_julian_day().convert_to_bytes(slice, cursor);
     }
 }
+
+#[cfg(feature = "solana-pubkey")]
+impl Rapira for solana_pubkey::Pubkey {
+    const STATIC_SIZE: Option<usize> = Some(32);
+    const MIN_SIZE: usize = 32;
+
+    fn size(&self) -> usize {
+        32
+    }
+
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        <[u8; 32]>::check_bytes(slice)
+    }
+
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let bytes = <[u8; 32]>::from_slice(slice)?;
+        Ok(Self::from(bytes))
+    }
+
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        self.as_array().convert_to_bytes(slice, cursor);
+    }
+}
