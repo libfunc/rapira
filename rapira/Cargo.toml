@@ -1,7 +1,7 @@
 [package]
 name = "rapira"
 description = "serialization library like borsh, bincode and speedy"
-version = "0.11.9"
+version = "0.11.10"
 authors = ["Rail Khusnutdinov <rail@33.run>"]
 keywords = ["serialization"]
 categories = []
@@ -22,16 +22,9 @@ default = [
     "zerocopy",
     "serde_json",
     "arrayvec",
-    "smallvec",
-    "indexmap",
-    "rust_decimal",
     "bytes",
-    "uuid",
-    "compact_str",
-    "ecow",
-    "byteview",
     "time",
-    "solana"
+    "smol_str"
 ]
 std = ["thiserror", "alloc", "simdutf8/std"]
 alloc = []
@@ -52,6 +45,7 @@ smallvec = { version = "1.8", optional = true, features = [
 ] }
 rust_decimal = { version = "1.27", optional = true }
 compact_str = { version = "0.9", optional = true }
+smol_str = { version = "0.3", optional = true }
 ecow = { version = "0.2", optional = true }
 bytes = { version = "1.4", optional = true }
 inline-array = { version = "0.1", optional = true }

@@ -1036,6 +1036,58 @@ impl crate::Rapira for compact_str::CompactString {
     }
 }
 
+#[cfg(feature = "smol_str")]
+impl crate::Rapira for smol_str::SmolStr {
+    const MIN_SIZE: usize = LEN_SIZE;
+
+    fn size(&self) -> usize {
+        4 + self.len()
+    }
+
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        crate::str_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
+    }
+
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = crate::str_rapira::from_slice(slice)?;
+        let s = Self::new(s);
+        Ok(s)
+    }
+
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let s = crate::str_rapira::from_slice_unsafe(slice)?;
+            let s = Self::new(s);
+            Ok(s)
+        }
+    }
+
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let s = crate::str_rapira::from_slice_unchecked(slice)?;
+            let s = Self::new(s);
+            Ok(s)
+        }
+    }
+
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        crate::str_rapira::convert_to_bytes(self, slice, cursor);
+    }
+
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
+        crate::str_rapira::try_convert_to_bytes(self, slice, cursor)
+    }
+}
+
 #[cfg(feature = "ecow")]
 impl crate::Rapira for ecow::EcoString {
     const MIN_SIZE: usize = LEN_SIZE;
