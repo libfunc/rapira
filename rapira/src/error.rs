@@ -29,6 +29,9 @@ pub enum RapiraError {
     MaxSize,
     #[cfg_attr(feature = "std", error("max capacity error"))]
     MaxCapacity,
+    #[cfg_attr(feature = "postcard", error(transparent))]
+    #[cfg(feature = "postcard")]
+    Postcard(#[from] postcard::Error),
     #[cfg_attr(feature = "std", error(transparent))]
     TryFromSlice(#[cfg_attr(feature = "std", from)] TryFromSliceError),
     #[cfg(feature = "std")]

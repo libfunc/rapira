@@ -14,6 +14,8 @@ mod primitive;
 
 pub use error::{RapiraError, Result};
 pub use from_u8::{EnumFromU8Error, FromU8};
+#[cfg(feature = "postcard")]
+pub use implements::postcard;
 #[cfg(feature = "zerocopy")]
 pub use implements::zero;
 pub use primitive::{byte_rapira, bytes_rapira, str_rapira};

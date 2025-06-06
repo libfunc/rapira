@@ -678,6 +678,113 @@ pub mod zero {
     }
 }
 
+#[cfg(feature = "postcard")]
+pub mod postcard {
+    use core::{marker::PhantomData, mem::size_of};
+
+    use postcard::{experimental::serialized_size, take_from_bytes, to_slice};
+    use serde::{Serialize, de::DeserializeOwned};
+
+    pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize>
+    where
+        T: Sized,
+    {
+        None
+    }
+
+    pub const fn min_size<T>(_: PhantomData<T>) -> usize
+    where
+        T: Sized,
+    {
+        size_of::<T>()
+    }
+
+    #[inline]
+    pub fn size<T>(val: &T) -> usize
+    where
+        T: Sized + Serialize,
+    {
+        serialized_size(val).unwrap()
+    }
+
+    #[inline]
+    pub fn check_bytes<T>(_: PhantomData<T>, slice: &mut &[u8]) -> crate::Result<()>
+    where
+        T: Sized + DeserializeOwned,
+    {
+        let (_, rem) = take_from_bytes::<T>(slice)?;
+        *slice = rem;
+
+        Ok(())
+    }
+
+    #[inline]
+    pub fn from_slice<T>(slice: &mut &[u8]) -> crate::Result<T>
+    where
+        T: DeserializeOwned + Sized,
+    {
+        let (val, rem) = take_from_bytes::<T>(slice)?;
+        *slice = rem;
+        Ok(val)
+    }
+
+    #[inline]
+    pub fn from_slice_unchecked<T>(slice: &mut &[u8]) -> crate::Result<T>
+    where
+        T: DeserializeOwned + Sized,
+    {
+        from_slice(slice)
+    }
+
+    /// .
+    ///
+    /// # Panics
+    ///
+    /// Panics if .
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if .
+    ///
+    /// # Safety
+    ///
+    /// .
+    #[inline]
+    pub unsafe fn from_slice_unsafe<T>(slice: &mut &[u8]) -> crate::Result<T>
+    where
+        T: DeserializeOwned + Sized,
+    {
+        from_slice(slice)
+    }
+
+    #[inline]
+    pub fn convert_to_bytes<T>(item: &T, slice: &mut [u8], cursor: &mut usize)
+    where
+        T: Serialize + Sized,
+    {
+        let bytes = slice.get_mut(*cursor..).unwrap();
+        let data = to_slice(item, bytes).unwrap();
+        *cursor += data.len();
+    }
+
+    #[inline]
+    pub fn try_convert_to_bytes<T>(
+        item: &T,
+        slice: &mut [u8],
+        cursor: &mut usize,
+    ) -> crate::Result<()>
+    where
+        T: Serialize + Sized,
+    {
+        let bytes = slice
+            .get_mut(*cursor..)
+            .ok_or(crate::RapiraError::SliceLen)?;
+        let data = to_slice(item, bytes)?;
+        *cursor += data.len();
+        Ok(())
+    }
+}
+
 #[cfg(feature = "serde_json")]
 impl crate::Rapira for serde_json::Value {
     const MIN_SIZE: usize = 1;
@@ -1499,5 +1606,40 @@ impl Rapira for solana_signature::Signature {
         let end = *cursor + 64;
         slice[*cursor..end].copy_from_slice(self.as_ref());
         *cursor = end;
+    }
+}
+
+#[cfg(feature = "rmp")]
+impl Rapira for rmpv::Value {
+    const MIN_SIZE: usize = 1;
+
+    fn size(&self) -> usize {
+        1 + match self {
+            rmpv::Value::Nil => 0,
+            rmpv::Value::Boolean(_) => 1,
+            rmpv::Value::Integer(_) => 8,
+            rmpv::Value::F32(_) => 4,
+            rmpv::Value::F64(_) => 8,
+            rmpv::Value::String(s) => 4 + s.as_bytes().len(),
+            rmpv::Value::Binary(items) => Rapira::size(items),
+            rmpv::Value::Array(values) => Rapira::size(values),
+            rmpv::Value::Map(items) => Rapira::size(items),
+            rmpv::Value::Ext(_, items) => 1 + Rapira::size(items),
+        }
+    }
+
+    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
+        todo!()
+    }
+
+    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        todo!()
     }
 }
