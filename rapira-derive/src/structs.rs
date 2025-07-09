@@ -15,6 +15,7 @@ pub fn struct_serializer(
     data_struct: &DataStruct,
     name: &Ident,
     generics: Generics,
+    is_debug: bool,
 ) -> proc_macro::TokenStream {
     let fields = &data_struct.fields;
     match fields {
@@ -44,6 +45,7 @@ pub fn struct_serializer(
 
             let mut field_names: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut from_slice: Vec<TokenStream> = Vec::with_capacity(named_len);
+            let mut debug_from_slice: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut from_slice_unchecked: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut from_slice_unsafe: Vec<TokenStream> = Vec::with_capacity(named_len);
@@ -79,6 +81,16 @@ pub fn struct_serializer(
                         from_slice.push(quote! {
                             let #ident: #typ = #with_attr::from_slice(slice)?;
                         });
+                        debug_from_slice.push(quote! {
+                            let len = slice.len();
+                            println!("Field: {}, Type: {}", stringify!(#ident), stringify!(#typ));
+                            let res = #with_attr::from_slice(slice).inspect(|v| {
+                                println!("len: {len}, {}: {v:?}", stringify!(#ident));
+                            }).inspect_err(|err| {
+                                println!("len: {len}, err: {err:?}");
+                            });
+                            let #ident: #typ = res?;
+                        });
                         from_slice_unchecked.push(quote! {
                             let #ident: #typ = #with_attr::from_slice_unchecked(slice)?;
                         });
@@ -95,6 +107,16 @@ pub fn struct_serializer(
                     None => {
                         from_slice.push(quote! {
                             let #ident = <#typ as rapira::Rapira>::from_slice(slice)?;
+                        });
+                        debug_from_slice.push(quote! {
+                            let len = slice.len();
+                            println!("Field: {}, Type: {}", stringify!(#ident), stringify!(#typ));
+                            let res = <#typ as rapira::Rapira>::from_slice(slice).inspect(|v| {
+                                println!("len: {len}, {}: {v:?}", stringify!(#ident));
+                            }).inspect_err(|err| {
+                                println!("len: {len}, err: {err:?}");
+                            });
+                            let #ident = res?;
                         });
                         check_bytes.push(quote! {
                             <#typ as rapira::Rapira>::check_bytes(slice)?;
@@ -127,6 +149,27 @@ pub fn struct_serializer(
 
             let name_with_generics = build_ident(name, generics);
 
+            let debug_parse = if is_debug {
+                quote! {
+                    /// Deserializes a value from a byte slice with debug logging.
+                    /// This method logs the struct name, field names, types, and values during deserialization.
+                    /// Useful for debugging serialization/deserialization issues.
+                    #[inline]
+                    fn debug_from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+                    where
+                        Self: Sized + std::fmt::Debug,
+                    {
+                        println!("Struct: {}", stringify!(#name));
+                        #(#debug_from_slice)*
+                        Ok(#name {
+                            #(#field_names)*
+                        })
+                    }
+                }
+            } else {
+                quote!()
+            };
+
             let res = quote! {
                 #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
@@ -142,6 +185,8 @@ pub fn struct_serializer(
                             #(#field_names)*
                         })
                     }
+
+                    #debug_parse
 
                     #[inline]
                     fn check_bytes(slice: &mut &[u8]) -> rapira::Result<()>
@@ -198,6 +243,7 @@ pub fn struct_serializer(
             let unnamed_len = unnamed.len();
             let mut field_names: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut from_slice: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
+            let mut debug_from_slice: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut from_slice_unchecked: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut from_slice_unsafe: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
@@ -236,6 +282,16 @@ pub fn struct_serializer(
                         from_slice.push(quote! {
                             let #field_name: #typ = #with_attr::from_slice(slice)?;
                         });
+                        debug_from_slice.push(quote! {
+                            let len = slice.len();
+                            println!("Field: unnamed (index {}), Type: {}", #idx, stringify!(#typ));
+                            let res = #with_attr::from_slice(slice).inspect(|v| {
+                                println!("len: {len}, unnamed (index {}): {v:?}", #idx);
+                            }).inspect_err(|err| {
+                                println!("len: {len}, err: {err:?}");
+                            });
+                            let #field_name: #typ = res?;
+                        });
                         from_slice_unchecked.push(quote! {
                             let #field_name: #typ = #with_attr::from_slice_unchecked(slice)?;
                         });
@@ -252,6 +308,16 @@ pub fn struct_serializer(
                     None => {
                         from_slice.push(quote! {
                             let #field_name = <#typ as rapira::Rapira>::from_slice(slice)?;
+                        });
+                        debug_from_slice.push(quote! {
+                            let len = slice.len();
+                            println!("Field: unnamed (index {}), Type: {}", #idx, stringify!(#typ));
+                            let res = <#typ as rapira::Rapira>::from_slice(slice).inspect(|v| {
+                                println!("len: {len}, unnamed (index {}): {v:?}", #idx);
+                            }).inspect_err(|err| {
+                                println!("len: {len}, err: {err:?}");
+                            });
+                            let #field_name = res?;
                         });
                         check_bytes.push(quote! {
                             <#typ as rapira::Rapira>::check_bytes(slice)?;
@@ -284,6 +350,25 @@ pub fn struct_serializer(
 
             let name_with_generics = build_ident(name, generics);
 
+            let debug_parse = if is_debug {
+                quote! {
+                    /// Deserializes a value from a byte slice with debug logging.
+                    /// This method logs the struct name, field indices, types, and values during deserialization.
+                    /// Useful for debugging serialization/deserialization issues.
+                    #[inline]
+                    fn debug_from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+                    where
+                        Self: Sized + std::fmt::Debug,
+                    {
+                        println!("Struct: {}", stringify!(#name));
+                        #(#debug_from_slice)*
+                        Ok(#name(#(#field_names)*))
+                    }
+                }
+            } else {
+                quote!()
+            };
+
             let res = quote! {
                 #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
@@ -297,6 +382,8 @@ pub fn struct_serializer(
                         #(#from_slice)*
                         Ok(#name(#(#field_names)*))
                     }
+
+                    #debug_parse
 
                     #[inline]
                     fn check_bytes(slice: &mut &[u8]) -> rapira::Result<()>

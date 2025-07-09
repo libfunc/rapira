@@ -2,7 +2,7 @@ extern crate proc_macro2;
 extern crate quote;
 extern crate syn;
 
-use syn::{Attribute, Expr, Ident, MetaNameValue};
+use syn::{Attribute, Expr, Ident, MetaNameValue, Path};
 
 /// `#[primitive(PrimitiveName)]` in enums
 pub fn get_primitive_name(attrs: &[Attribute]) -> Option<Ident> {
@@ -43,4 +43,17 @@ pub fn min_size(attrs: &[Attribute]) -> Option<Expr> {
 
         None
     })
+}
+
+/// `#[rapira(debug)]`
+pub fn debug_attr(attrs: &[Attribute]) -> bool {
+    for item in attrs.iter() {
+        if item.path().is_ident("rapira")
+            && let Ok(nv) = item.parse_args::<Path>()
+            && nv.is_ident("debug")
+        {
+            return true;
+        }
+    }
+    false
 }

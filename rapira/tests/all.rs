@@ -1,4 +1,5 @@
 use rapira::*;
+use serde::{Deserialize, Serialize};
 use zerocopy::{
     FromBytes, Immutable, IntoBytes, KnownLayout,
     byteorder::{LE, U64},
@@ -23,21 +24,27 @@ struct StructVecFields {
     byte: u8,
 }
 
+impl StructVecFields {
+    pub fn random() -> Self {
+        Self {
+            vec: vec![0, 4, 6, 7],
+            arr: [-1, 0, 4, 7, -8, 9, -1, 2],
+            arr_bytes: [0, 1, 2, 3],
+            byte: 4,
+        }
+    }
+}
+
 #[test]
 fn test_vec_fields() -> Result<()> {
-    let item = StructVecFields {
-        vec: vec![0, 4, 6, 7],
-        arr: [-1, 0, 4, 7, -8, 9, -1, 2],
-        arr_bytes: [0, 1, 2, 3],
-        byte: 4,
-    };
+    let item = StructVecFields::random();
 
     let vec = serialize(&item);
     assert!(item == deserialize::<StructVecFields>(&vec)?);
     Ok(())
 }
 
-#[derive(Debug, Rapira, PartialEq)]
+#[derive(Debug, Rapira, PartialEq, Serialize, Deserialize)]
 struct UnnamedFields(
     Vec<u8>,
     [i32; 8],
@@ -45,14 +52,20 @@ struct UnnamedFields(
     #[rapira(with = rapira::byte_rapira)] u8,
 );
 
+impl UnnamedFields {
+    pub fn random() -> Self {
+        Self(
+            vec![0, 4, 6, 7],
+            [-1, 0, 4, 7, -8, 9, -1, 2],
+            [0, 1, 2, 3],
+            4,
+        )
+    }
+}
+
 #[test]
 fn test_unnamed_fields() -> Result<()> {
-    let item = UnnamedFields(
-        vec![0, 4, 6, 7],
-        [-1, 0, 4, 7, -8, 9, -1, 2],
-        [0, 1, 2, 3],
-        4,
-    );
+    let item = UnnamedFields::random();
 
     let vec = serialize(&item);
     assert!(item == deserialize::<UnnamedFields>(&vec)?);
@@ -105,13 +118,23 @@ enum FullEnum {
     D,
 }
 
-#[derive(Debug, Rapira, PartialEq)]
+#[derive(Debug, Rapira, PartialEq, Serialize, Deserialize)]
 #[rapira(static_size = None)]
 #[rapira(min_size = 1)]
 enum NonStaticSized {
     A(String),
     B(Box<NonStaticSized>),
     C,
+}
+
+impl NonStaticSized {
+    pub fn random() -> Self {
+        Self::A(String::from("asd"))
+    }
+
+    pub fn random_with_child() -> Self {
+        Self::B(Box::new(Self::random()))
+    }
 }
 
 #[test]
@@ -145,9 +168,48 @@ fn test_enum() -> Result<()> {
     let vec = serialize(&d);
     assert!(d == deserialize::<FullEnum>(&vec)?);
 
-    let e = NonStaticSized::B(Box::new(NonStaticSized::A(String::from("asd"))));
+    let e = NonStaticSized::random_with_child();
     let vec = serialize(&e);
     assert!(e == deserialize::<NonStaticSized>(&vec)?);
+
+    Ok(())
+}
+
+#[cfg(feature = "postcard")]
+#[test]
+fn test_postcard_fields() -> Result<()> {
+    #[derive(Debug, Rapira, PartialEq)]
+    struct PostcardFields {
+        #[rapira(with = rapira::postcard)]
+        vec: Vec<u8>,
+        arr: [i32; 8],
+        arr_bytes: [u8; 4],
+        #[rapira(with = rapira::byte_rapira)]
+        byte: u8,
+        name: String,
+        #[rapira(with = rapira::postcard)]
+        e1: NonStaticSized,
+        #[rapira(with = rapira::postcard)]
+        e2: NonStaticSized,
+        #[rapira(with = rapira::postcard)]
+        s1: UnnamedFields,
+    }
+
+    let fields = PostcardFields {
+        vec: vec![1, 2, 3, 4],
+        arr: [1, 2, 3, 4, 5, 6, 7, 8],
+        arr_bytes: [1, 2, 3, 4],
+        byte: 42,
+        name: "John".to_owned(),
+        e1: NonStaticSized::random_with_child(),
+        e2: NonStaticSized::random(),
+        s1: UnnamedFields::random(),
+    };
+
+    let vec = serialize(&fields);
+    let new_fields: PostcardFields = deserialize(&vec)?;
+
+    assert_eq!(fields, new_fields);
 
     Ok(())
 }

@@ -678,6 +678,78 @@ pub mod zero {
     }
 }
 
+#[cfg(feature = "bytemuck")]
+pub mod bytemuck {
+    use core::{marker::PhantomData, mem::size_of};
+
+    use bytemuck::{Pod, Zeroable};
+
+    pub const fn static_size<T>(_: PhantomData<T>) -> Option<usize>
+    where
+        T: Sized,
+    {
+        None
+    }
+
+    pub const fn min_size<T>(_: PhantomData<T>) -> usize
+    where
+        T: Sized,
+    {
+        size_of::<T>()
+    }
+
+    #[inline]
+    pub fn size<T>(val: &T) -> usize
+    where
+        T: Sized + Pod + Zeroable,
+    {
+        size_of::<T>()
+    }
+
+    #[inline]
+    pub fn convert_to_bytes<T>(item: &T, slice: &mut [u8], cursor: &mut usize)
+    where
+        T: Immutable + Pod + Zeroable + Sized,
+    {
+        let bytes = bytemuck::bytes_of(item);
+        extend(slice, cursor, bytes);
+    }
+
+    #[inline]
+    pub fn try_convert_to_bytes<T>(
+        item: &T,
+        slice: &mut [u8],
+        cursor: &mut usize,
+    ) -> crate::Result<()>
+    where
+        T: Immutable + Pod + Zeroable + Sized,
+    {
+        let bytes = bytemuck::bytes_of(item);
+        try_extend(slice, cursor, bytes)?;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn convert_from_bytes<T>(slice: &[u8], cursor: &mut usize) -> Option<T>
+    where
+        T: Immutable + Pod + Zeroable + Sized,
+    {
+        let bytes = slice.get(*cursor..*cursor + size_of::<T>())?;
+        *cursor += size_of::<T>();
+        Some(bytemuck::from_bytes(bytes))
+    }
+
+    #[inline]
+    pub fn try_convert_from_bytes<T>(slice: &[u8], cursor: &mut usize) -> crate::Result<T>
+    where
+        T: Immutable + Pod + Zeroable + Sized,
+    {
+        let bytes = slice.get(*cursor..*cursor + size_of::<T>())?;
+        *cursor += size_of::<T>();
+        Ok(bytemuck::from_bytes(bytes))
+    }
+}
+
 #[cfg(feature = "postcard")]
 pub mod postcard {
     use core::{marker::PhantomData, mem::size_of};

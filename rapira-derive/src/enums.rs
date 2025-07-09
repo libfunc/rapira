@@ -17,6 +17,7 @@ pub fn enum_serializer(
     static_size: Option<Expr>,
     min_size: Option<Expr>,
     generics: Generics,
+    is_debug: bool,
 ) -> proc_macro::TokenStream {
     let variants_len = data_enum.variants.len();
 
@@ -25,6 +26,7 @@ pub fn enum_serializer(
     let mut size: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut from_slice: Vec<TokenStream> = Vec::with_capacity(variants_len);
+    let mut debug_from_slice: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut from_slice_unchecked: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut from_slice_unsafe: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut try_convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
@@ -80,6 +82,12 @@ pub fn enum_serializer(
                 min_sizes.push(quote! {
                     0,
                 });
+                debug_from_slice.push(quote! {
+                    #variant_id => {
+                        println!("Variant: {}::{}", stringify!(#name), stringify!(#variant_name));
+                        Ok(#name::#variant_name)
+                    }
+                });
             }
             Fields::Unnamed(fields) => {
                 let len = fields.unnamed.len();
@@ -90,6 +98,7 @@ pub fn enum_serializer(
                 let mut fields_min_sizes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_size: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_from_slice: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_debug_from_slice: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_check_bytes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_from_slice_unchecked: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_from_slice_unsafe: Vec<TokenStream> = Vec::with_capacity(len);
@@ -123,6 +132,16 @@ pub fn enum_serializer(
                             fields_from_slice.push(quote! {
                                 let #field_name: #typ = #with_attr::from_slice(slice)?;
                             });
+                            fields_debug_from_slice.push(quote! {
+                                let len = slice.len();
+                                println!("Field: unnamed (index {}), Type: {}", #idx, stringify!(#typ));
+                                let res = #with_attr::from_slice(slice).inspect(|v| {
+                                    println!("len: {len}, unnamed (index {}): {v:?}", #idx);
+                                }).inspect_err(|err| {
+                                    println!("len: {len}, err: {err:?}");
+                                });
+                                let #field_name: #typ = res?;
+                            });
                             fields_from_slice_unchecked.push(quote! {
                                 let #field_name: #typ = #with_attr::from_slice_unchecked(slice)?;
                             });
@@ -151,6 +170,16 @@ pub fn enum_serializer(
                             );
                             fields_from_slice.push(quote! {
                                 let #field_name = <#typ as rapira::Rapira>::from_slice(slice)?;
+                            });
+                            fields_debug_from_slice.push(quote! {
+                                let len = slice.len();
+                                println!("Field: unnamed (index {}), Type: {}", #idx, stringify!(#typ));
+                                let res = <#typ as rapira::Rapira>::from_slice(slice).inspect(|v| {
+                                    println!("len: {len}, unnamed: {v:?}");
+                                }).inspect_err(|err| {
+                                    println!("len: {len}, err: {err:?}");
+                                });
+                                let #field_name: #typ = res?;
                             });
                             fields_check_bytes.push(quote! {
                                 <#typ as rapira::Rapira>::check_bytes(slice)?;
@@ -185,6 +214,13 @@ pub fn enum_serializer(
                 from_slice.push(quote! {
                     #variant_id => {
                         #(#fields_from_slice)*
+                        Ok(#name::#variant_name(#(#field_names)*))
+                    }
+                });
+                debug_from_slice.push(quote! {
+                    #variant_id => {
+                        println!("Variant: {}::{}", stringify!(#name), stringify!(#variant_name));
+                        #(#fields_debug_from_slice)*
                         Ok(#name::#variant_name(#(#field_names)*))
                     }
                 });
@@ -251,6 +287,7 @@ pub fn enum_serializer(
                 let mut fields_size: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_min_sizes: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_debug_from_slice: Vec<TokenStream> = Vec::with_capacity(len);
 
                 for field in fields_insert.iter().map(|(f, _)| f) {
                     let typ = &field.ty;
@@ -279,6 +316,16 @@ pub fn enum_serializer(
                             fields_from_slice.push(quote! {
                                 let #field_name: #typ = #with_attr::from_slice(slice)?;
                             });
+                            fields_debug_from_slice.push(quote! {
+                                let len = slice.len();
+                                println!("Field: {}, Type: {}", stringify!(#field_name), stringify!(#typ));
+                                let res = #with_attr::from_slice(slice).inspect(|v| {
+                                    println!("len: {len}, {}: {v:?}", stringify!(#field_name));
+                                }).inspect_err(|err| {
+                                    println!("len: {len}, err: {err:?}");
+                                });
+                                let #field_name: #typ = res?;
+                            });
                             fields_from_slice_unchecked.push(quote! {
                                 let #field_name: #typ = #with_attr::from_slice_unchecked(slice)?;
                             });
@@ -295,6 +342,16 @@ pub fn enum_serializer(
                         None => {
                             fields_from_slice.push(quote! {
                                 let #field_name = <#typ as rapira::Rapira>::from_slice(slice)?;
+                            });
+                            fields_debug_from_slice.push(quote! {
+                                let len = slice.len();
+                                println!("Field: {}, Type: {}", stringify!(#field_name), stringify!(#typ));
+                                let res = <#typ as rapira::Rapira>::from_slice(slice).inspect(|v| {
+                                    println!("len: {len}, {}: {v:?}", stringify!(#field_name));
+                                }).inspect_err(|err| {
+                                    println!("len: {len}, err: {err:?}");
+                                });
+                                let #field_name = res?;
                             });
                             fields_check_bytes.push(quote! {
                                 <#typ as rapira::Rapira>::check_bytes(slice)?;
@@ -341,6 +398,13 @@ pub fn enum_serializer(
                 from_slice.push(quote! {
                     #variant_id => {
                         #(#fields_from_slice)*
+                        Ok(#name::#variant_name{#(#field_names)*})
+                    }
+                });
+                debug_from_slice.push(quote! {
+                    #variant_id => {
+                        println!("Variant: {}::{}", stringify!(#name), stringify!(#variant_name));
+                        #(#fields_debug_from_slice)*
                         Ok(#name::#variant_name{#(#field_names)*})
                     }
                 });
@@ -407,6 +471,27 @@ pub fn enum_serializer(
 
     let name_with_generics = build_ident(name, generics);
 
+    let debug_parse = if is_debug {
+        quote! {
+            /// Deserializes a value from a byte slice with debug logging.
+            /// This method logs the enum variant name, field names, types, and values during deserialization.
+            /// Useful for debugging serialization/deserialization issues.
+            #[inline]
+            fn debug_from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+            where
+                Self: Sized + std::fmt::Debug,
+            {
+                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                match val {
+                    #(#debug_from_slice)*
+                    _ => Err(rapira::RapiraError::EnumVariant),
+                }
+            }
+        }
+    } else {
+        quote!()
+    };
+
     let res = quote! {
         #name_with_generics {
             const STATIC_SIZE: Option<usize> = #static_size;
@@ -423,6 +508,8 @@ pub fn enum_serializer(
                     _ => Err(rapira::RapiraError::EnumVariant),
                 }
             }
+
+            #debug_parse
 
             #[inline]
             fn check_bytes(slice: &mut &[u8]) -> rapira::Result<()>

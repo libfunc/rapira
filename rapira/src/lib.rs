@@ -44,6 +44,21 @@ pub trait Rapira {
     where
         Self: Sized;
 
+    #[inline]
+    fn debug_from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized + std::fmt::Debug,
+    {
+        let len = slice.len();
+        Self::from_slice(slice)
+            .inspect(|item| {
+                println!("len: {len}, item: {item:?}");
+            })
+            .inspect_err(|err| {
+                println!("len: {len}, err: {err:?}");
+            })
+    }
+
     /// # Safety
     ///
     /// this mean not unsafe, but unchecked

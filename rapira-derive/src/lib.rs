@@ -25,14 +25,16 @@ use syn::{Data, DeriveInput, Fields, Ident, parse_macro_input};
 /// - `#[rapira(min_size = expr)]`
 /// - `#[rapira(with = path)]`
 /// - `#[rapira(skip)]`
+/// - `#[rapira(debug)]`
 #[proc_macro_derive(Rapira, attributes(rapira, idx, primitive))]
 pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(stream as DeriveInput);
     let name = &ast.ident;
     let data = &ast.data;
+    let is_debug = attributes::debug_attr(&ast.attrs);
 
     match data {
-        Data::Struct(data_struct) => struct_serializer(data_struct, name, ast.generics),
+        Data::Struct(data_struct) => struct_serializer(data_struct, name, ast.generics, is_debug),
         Data::Enum(data_enum) => {
             let is_simple_enum = data_enum.variants.iter().all(|item| item.fields.is_empty());
             if is_simple_enum {
@@ -47,7 +49,14 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
                     None => {
                         let enum_static_size = attributes::enum_static_size(&ast.attrs);
                         let min_size = attributes::min_size(&ast.attrs);
-                        enum_serializer(data_enum, name, enum_static_size, min_size, ast.generics)
+                        enum_serializer(
+                            data_enum,
+                            name,
+                            enum_static_size,
+                            min_size,
+                            ast.generics,
+                            is_debug,
+                        )
                     }
                 }
             }

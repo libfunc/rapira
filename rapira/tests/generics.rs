@@ -1,7 +1,9 @@
 use rapira::*;
+use std::fmt::Debug;
 
-#[derive(Rapira, PartialEq)]
-struct StructWithGeneric<T: PartialEq + Rapira, const N: usize> {
+#[derive(Rapira, Debug, PartialEq)]
+#[rapira(debug)]
+struct StructWithGeneric<T: PartialEq + Rapira + Debug, const N: usize> {
     a: String,
     b: u32,
     c: T,
@@ -9,10 +11,11 @@ struct StructWithGeneric<T: PartialEq + Rapira, const N: usize> {
     e: [u16; N],
 }
 
-#[derive(Rapira, PartialEq)]
+#[derive(Rapira, Debug, PartialEq)]
+#[rapira(debug)]
 enum EnumWithGeneric<T>
 where
-    T: PartialEq + Rapira,
+    T: PartialEq + Rapira + Debug,
 {
     A(T),
     B(u32),
