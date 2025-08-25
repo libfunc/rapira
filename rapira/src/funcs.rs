@@ -26,6 +26,17 @@ pub fn extend_vec<T: Rapira>(item: &T, bytes: &mut Vec<u8>) {
     item.convert_to_bytes(bytes, &mut cursor);
 }
 
+/// write to vec of bytes with serialized object
+#[cfg(feature = "alloc")]
+pub fn write_to_vec<T: Rapira>(item: &T, bytes: &mut Vec<u8>) {
+    let value_size = size(item);
+    let len = bytes.len();
+    if len < value_size {
+        bytes.resize(value_size, 0);
+    }
+    item.convert_to_bytes(bytes, &mut 0);
+}
+
 /// Check oversize vec and other items with capacity initialization
 /// (max memory limit attack...)
 /// check cursor oveflow,
@@ -37,6 +48,33 @@ where
     let mut bytes = bytes;
     T::check_bytes(&mut bytes)
 }
+
+/// use `deserialize` function to read data to slice
+pub fn read_to<T: Rapira>(mut bytes: &[u8], mut iter: impl Extend<T>) -> Result<()> {
+    while !bytes.is_empty() {
+        let item = T::from_slice(&mut bytes)?;
+        iter.extend(Some(item));
+    }
+    Ok(())
+}
+
+// #[cfg(feature = "std")]
+// pub fn encode_to_writer(item: &impl Rapira, mut writer: impl std::io::Write) -> Result<()> {
+//     let value_size = size(item);
+//     let mut bytes = vec![0u8; value_size];
+//     item.convert_to_bytes(&mut bytes, &mut 0);
+//     writer.write_all(&bytes).map_err(crate::RapiraError::from)?;
+//     Ok(())
+// }
+
+// #[cfg(feature = "std")]
+// pub fn decode_from_reader<T: Rapira>(mut reader: impl std::io::Read) -> Result<T> {
+//     let mut bytes = Vec::new();
+//     reader
+//         .read_to_end(&mut bytes)
+//         .map_err(crate::RapiraError::from)?;
+//     deserialize(&bytes)
+// }
 
 /// Check oversize vec and other items with capacity initialization
 /// with MaxCapacity trait

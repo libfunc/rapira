@@ -1,4 +1,6 @@
 use core::array::TryFromSliceError;
+#[cfg(feature = "std")]
+use std::io::Error as IoError;
 
 #[cfg(feature = "std")]
 use thiserror::Error;
@@ -35,6 +37,8 @@ pub enum RapiraError {
     #[cfg_attr(feature = "std", error(transparent))]
     TryFromSlice(#[cfg_attr(feature = "std", from)] TryFromSliceError),
     #[cfg(feature = "std")]
+    #[cfg_attr(feature = "std", error("io error: {0}"))]
+    Io(#[from] IoError),
     #[cfg_attr(feature = "std", error("other error: {0}"))]
     Other(&'static str),
 }

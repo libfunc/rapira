@@ -4,7 +4,7 @@ use core::{
     time::Duration,
 };
 
-use crate::{Rapira, RapiraError, Result, push, static_size, try_push};
+use crate::{Rapira, RapiraError, Result, enum_min_size, enum_size, push, static_size, try_push};
 
 impl Rapira for () {
     const STATIC_SIZE: Option<usize> = Some(0);
@@ -754,6 +754,196 @@ impl<T: Rapira> Rapira for Option<T> {
             }
             None => {
                 push(slice, cursor, 0);
+            }
+        }
+    }
+}
+
+impl<T: Rapira, E: Rapira> Rapira for Result<T, E> {
+    const STATIC_SIZE: Option<usize> = enum_size([T::STATIC_SIZE, E::STATIC_SIZE]);
+    const MIN_SIZE: usize = enum_min_size(&[T::MIN_SIZE, E::MIN_SIZE]);
+
+    #[inline]
+    fn size(&self) -> usize {
+        match self {
+            Ok(t) => 1 + t.size(),
+            Err(e) => 1 + e.size(),
+        }
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()>
+    where
+        Self: Sized,
+    {
+        let discriminant = byte_rapira::from_slice(slice)?;
+        match discriminant {
+            0 => T::check_bytes(slice),
+            1 => E::check_bytes(slice),
+            _ => Err(RapiraError::EnumVariant),
+        }
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let discriminant = byte_rapira::from_slice(slice)?;
+        match discriminant {
+            0 => Ok(Ok(T::from_slice(slice)?)),
+            1 => Ok(Err(E::from_slice(slice)?)),
+            _ => Err(RapiraError::EnumVariant),
+        }
+    }
+
+    #[inline]
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let discriminant = byte_rapira::from_slice_unchecked(slice)?;
+            match discriminant {
+                0 => Ok(Ok(T::from_slice_unchecked(slice)?)),
+                1 => Ok(Err(E::from_slice_unchecked(slice)?)),
+                _ => Err(RapiraError::EnumVariant),
+            }
+        }
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let b = byte_rapira::from_slice_unsafe(slice)?;
+            if b == 0 {
+                let t = T::from_slice_unsafe(slice)?;
+                Ok(Ok(t))
+            } else {
+                let e = E::from_slice_unsafe(slice)?;
+                Ok(Err(e))
+            }
+        }
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        match self.as_ref() {
+            Ok(s) => {
+                try_push(slice, cursor, 0)?;
+                s.try_convert_to_bytes(slice, cursor)?;
+            }
+            Err(e) => {
+                try_push(slice, cursor, 1)?;
+                e.try_convert_to_bytes(slice, cursor)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        match self.as_ref() {
+            Ok(s) => {
+                push(slice, cursor, 0);
+                s.convert_to_bytes(slice, cursor);
+            }
+            Err(e) => {
+                push(slice, cursor, 1);
+                e.convert_to_bytes(slice, cursor);
+            }
+        }
+    }
+}
+
+#[cfg(feature = "either")]
+impl<L: Rapira, R: Rapira> Rapira for either::Either<L, R> {
+    const STATIC_SIZE: Option<usize> = enum_size([L::STATIC_SIZE, R::STATIC_SIZE]);
+    const MIN_SIZE: usize = enum_min_size(&[L::MIN_SIZE, R::MIN_SIZE]);
+
+    #[inline]
+    fn size(&self) -> usize {
+        1 + match self {
+            either::Either::Left(l) => l.size(),
+            either::Either::Right(r) => r.size(),
+        }
+    }
+
+    #[inline]
+    fn check_bytes(slice: &mut &[u8]) -> Result<()> {
+        let discriminant = byte_rapira::from_slice(slice)?;
+        match discriminant {
+            0 => L::check_bytes(slice),
+            1 => R::check_bytes(slice),
+            _ => Err(RapiraError::EnumVariant),
+        }
+    }
+
+    #[inline]
+    fn from_slice(slice: &mut &[u8]) -> Result<Self> {
+        let discriminant = byte_rapira::from_slice(slice)?;
+        match discriminant {
+            0 => Ok(either::Either::Left(L::from_slice(slice)?)),
+            1 => Ok(either::Either::Right(R::from_slice(slice)?)),
+            _ => Err(RapiraError::EnumVariant),
+        }
+    }
+
+    #[inline]
+    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let discriminant = byte_rapira::from_slice_unchecked(slice)?;
+            match discriminant {
+                0 => Ok(either::Either::Left(L::from_slice_unchecked(slice)?)),
+                1 => Ok(either::Either::Right(R::from_slice_unchecked(slice)?)),
+                _ => Err(RapiraError::EnumVariant),
+            }
+        }
+    }
+
+    #[inline]
+    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self> {
+        unsafe {
+            let discriminant = byte_rapira::from_slice_unsafe(slice)?;
+            match discriminant {
+                0 => Ok(either::Either::Left(L::from_slice_unsafe(slice)?)),
+                1 => Ok(either::Either::Right(R::from_slice_unsafe(slice)?)),
+                _ => Err(RapiraError::EnumVariant),
+            }
+        }
+    }
+
+    #[inline]
+    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> Result<()> {
+        match self {
+            either::Either::Left(l) => {
+                try_push(slice, cursor, 0)?;
+                l.try_convert_to_bytes(slice, cursor)?;
+            }
+            either::Either::Right(r) => {
+                try_push(slice, cursor, 1)?;
+                r.try_convert_to_bytes(slice, cursor)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+        match self {
+            either::Either::Left(l) => {
+                push(slice, cursor, 0);
+                l.convert_to_bytes(slice, cursor);
+            }
+            either::Either::Right(r) => {
+                push(slice, cursor, 1);
+                r.convert_to_bytes(slice, cursor);
             }
         }
     }
