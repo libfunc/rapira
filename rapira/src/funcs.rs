@@ -8,6 +8,11 @@ pub fn size<T: Rapira>(item: &T) -> usize {
     }
 }
 
+pub fn write_to_array<const N: usize, T: Rapira>(item: &T, bytes: &mut [u8; N]) {
+    assert_eq!(N, T::STATIC_SIZE.unwrap());
+    item.convert_to_bytes(bytes, &mut 0);
+}
+
 /// serialize obect and return vec of bytes
 #[cfg(feature = "alloc")]
 pub fn serialize<T: Rapira>(item: &T) -> Vec<u8> {
