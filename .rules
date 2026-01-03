@@ -1,5 +1,7 @@
 # Rapira Codebase Guide
 
+This is serialization library like Rust libraries: bincode, borsh.
+
 ## Build & Test Commands
 - Build: `cargo build`
 - Test: `cargo test`
@@ -20,5 +22,4 @@
 - Testing: Write tests in dedicated test modules/files
 
 ## Special Notes
-- Serialization library similar to borsh and bincode
 - Supports no_std environments with feature flags

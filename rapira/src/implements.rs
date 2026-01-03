@@ -1,8 +1,6 @@
-use crate::{LEN_SIZE, Rapira};
-
 #[cfg(feature = "arrayvec")]
 impl<T: crate::Rapira, const CAP: usize> crate::Rapira for arrayvec::ArrayVec<T, CAP> {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -102,7 +100,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for arrayvec::ArrayVec<T,
 
 #[cfg(feature = "arrayvec")]
 impl<const CAP: usize> crate::Rapira for arrayvec::ArrayString<CAP> {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -166,7 +164,7 @@ impl<const CAP: usize> crate::Rapira for arrayvec::ArrayString<CAP> {
 
 #[cfg(feature = "smallvec")]
 impl<T: crate::Rapira, const CAP: usize> crate::Rapira for smallvec::SmallVec<[T; CAP]> {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -278,7 +276,7 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for smallvec::SmallVec<[T
 
 #[cfg(feature = "bytes")]
 impl crate::Rapira for bytes::Bytes {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -335,7 +333,7 @@ impl crate::Rapira for bytes::Bytes {
 
 #[cfg(feature = "byteview")]
 impl crate::Rapira for byteview::StrView {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -392,7 +390,7 @@ impl crate::Rapira for byteview::StrView {
 
 #[cfg(feature = "byteview")]
 impl crate::Rapira for byteview::ByteView {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -449,7 +447,7 @@ impl crate::Rapira for byteview::ByteView {
 
 #[cfg(feature = "fjall")]
 impl crate::Rapira for fjall::Slice {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -506,7 +504,7 @@ impl crate::Rapira for fjall::Slice {
 
 #[cfg(feature = "inline-array")]
 impl crate::Rapira for inline_array::InlineArray {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -1165,7 +1163,7 @@ impl crate::Rapira for rust_decimal::Decimal {
 
 #[cfg(feature = "compact_str")]
 impl crate::Rapira for compact_str::CompactString {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     fn size(&self) -> usize {
         4 + self.len()
@@ -1217,7 +1215,7 @@ impl crate::Rapira for compact_str::CompactString {
 
 #[cfg(feature = "smol_str")]
 impl crate::Rapira for smol_str::SmolStr {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     fn size(&self) -> usize {
         4 + self.len()
@@ -1269,7 +1267,7 @@ impl crate::Rapira for smol_str::SmolStr {
 
 #[cfg(feature = "ecow")]
 impl crate::Rapira for ecow::EcoString {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     fn size(&self) -> usize {
         4 + self.len()
@@ -1324,7 +1322,7 @@ impl<T> crate::Rapira for ecow::EcoVec<T>
 where
     T: crate::Rapira + Clone,
 {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -1443,7 +1441,7 @@ where
     K: Eq + core::hash::Hash,
     S: core::hash::Hasher + core::default::Default,
 {
-    const MIN_SIZE: usize = LEN_SIZE;
+    const MIN_SIZE: usize = crate::LEN_SIZE;
 
     #[inline]
     fn size(&self) -> usize {
@@ -1600,7 +1598,7 @@ impl crate::Rapira for uuid::Uuid {
 }
 
 #[cfg(feature = "time")]
-impl Rapira for time::Date {
+impl crate::Rapira for time::Date {
     const STATIC_SIZE: Option<usize> = Some(4);
     const MIN_SIZE: usize = 4;
 
@@ -1628,7 +1626,7 @@ impl Rapira for time::Date {
 }
 
 #[cfg(feature = "solana")]
-impl Rapira for solana_pubkey::Pubkey {
+impl crate::Rapira for solana_pubkey::Pubkey {
     const STATIC_SIZE: Option<usize> = Some(32);
     const MIN_SIZE: usize = 32;
 
@@ -1654,7 +1652,7 @@ impl Rapira for solana_pubkey::Pubkey {
 }
 
 #[cfg(feature = "solana")]
-impl Rapira for solana_signature::Signature {
+impl crate::Rapira for solana_signature::Signature {
     const STATIC_SIZE: Option<usize> = Some(64);
     const MIN_SIZE: usize = 64;
 
@@ -1682,7 +1680,7 @@ impl Rapira for solana_signature::Signature {
 }
 
 #[cfg(feature = "rmp")]
-impl Rapira for rmpv::Value {
+impl crate::Rapira for rmpv::Value {
     const MIN_SIZE: usize = 1;
 
     fn size(&self) -> usize {
