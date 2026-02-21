@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "899363528067",
+  "session_id": "75b73db4-09fd-4c97-be16-7589f05d7c1b",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-21T21:37:34.511355Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "a352b35eb3fa",
+  "transcript_identifier_at_start": "917a8fae-4714-47f3-aec8-44ffabf56b20",
+  "token_usage": {
+    "input_tokens": 13,
+    "cache_creation_tokens": 99592,
+    "cache_read_tokens": 553087,
+    "output_tokens": 2299,
+    "api_call_count": 11
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-21T21:37:34.411822Z",
+    "agent_lines": 99,
+    "human_added": 73,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 172,
+    "agent_percentage": 57.55813953488372
+  },
+  "transcript_path": ".claude/projects/-Users-railka-libfunc-rapira/75b73db4-09fd-4c97-be16-7589f05d7c1b.jsonl"
+}

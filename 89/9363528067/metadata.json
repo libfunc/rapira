@@ -3,7 +3,7 @@
   "checkpoint_id": "899363528067",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "CLAUDE.md",
     "GEMINI.md"
@@ -15,13 +15,20 @@
       "context": "/89/9363528067/0/context.md",
       "content_hash": "/89/9363528067/0/content_hash.txt",
       "prompt": "/89/9363528067/0/prompt.txt"
+    },
+    {
+      "metadata": "/89/9363528067/1/metadata.json",
+      "transcript": "/89/9363528067/1/full.jsonl",
+      "context": "/89/9363528067/1/context.md",
+      "content_hash": "/89/9363528067/1/content_hash.txt",
+      "prompt": "/89/9363528067/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 139828,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 98087,
-    "output_tokens": 995,
-    "api_call_count": 6
+    "input_tokens": 139841,
+    "cache_creation_tokens": 99592,
+    "cache_read_tokens": 651174,
+    "output_tokens": 3294,
+    "api_call_count": 17
   }
 }
