@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "899363528067",
+  "session_id": "4d291cc7-5979-492a-9eba-c9c717b12af8",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-21T21:37:34.3699Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md",
+    "GEMINI.md"
+  ],
+  "agent": "Gemini CLI",
+  "turn_id": "e41780792dd1",
+  "transcript_identifier_at_start": "6410561b-8099-4ebf-bf38-32f96a370cf8",
+  "token_usage": {
+    "input_tokens": 139828,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 98087,
+    "output_tokens": 995,
+    "api_call_count": 6
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-21T21:37:34.340728Z",
+    "agent_lines": 170,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 2,
+    "total_committed": 170,
+    "agent_percentage": 100
+  },
+  "transcript_path": ".gemini/tmp/rapira/chats/session-2026-02-21T21-32-4d291cc7.json"
+}
