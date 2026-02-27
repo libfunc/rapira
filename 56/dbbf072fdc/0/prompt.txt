@@ -1,0 +1,305 @@
+Implement the following plan:
+
+# Versioned Deserialization для Rapira
+
+## Context
+
+Данные хранятся в БД. Миграции будут применяться, но в короткий промежуток нужна возможность читать старые данные (без новых полей) новым кодом. Версия схемы хранится **внешне** (в метаданных БД), не в сериализованных данных. Нужна только обратная совместимость (новый код + старые данные).
+
+## Подход
+
+Добавить метод `from_slice_versioned(slice, version)` в трейт `Rapira` с default-реализацией, которая делегирует к `from_slice`. Для versioned-структур derive-макрос генерирует override, который условно читает поля на основе переданной версии. Коллекции (Vec, BTreeMap, Box, Option и т.д.) получают override для проброса версии во вложенные типы.
+
+**Сериализация не меняется** — `convert_to_bytes`, `size`, `try_convert_to_bytes` всегда пишут все поля (текущая версия). Изменения только в десериализации.
+
+**Без `since` атрибутов** — код генерируется точно как раньше (from_slice_versioned просто вызовет from_slice по default-impl).
+
+## Изменения по файлам
+
+### 1. `rapira/src/lib.rs` — новый метод в трейте
+
+```rust
+// Добавить в trait Rapira после from_slice_unsafe:
+fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self>
+where
+    Self: Sized,
+{
+    Self::from_slice(slice)
+}
+```
+
+### 2. `rapira/src/funcs.rs` — top-level функция
+
+```rust
+pub fn deserialize_versioned<T: Rapira>(mut bytes: &[u8], version: u8) -> Result<T> {
+    T::from_slice_versioned(&mut bytes, version)
+}
+```
+
+### 3. `rapira/src/allocated.rs` — проброс версии в коллекциях
+
+Добавить `from_slice_versioned` для типов, которые содержат `T: Rapira`:
+
+- **`Vec<T>`** (line 118) — вместо `T::from_slice(slice)` вызывает `T::from_slice_versioned(slice, version)`
+- **`BTreeMap<K, V>`** (line ~286) — пробрасывает version в K и V
+- **`Box<T>`** (line ~226) — делегирует к `T::from_slice_versioned`
+- **`Cow<'_, str>`**, **`Cow<'_, [u8]>`** — можно пропустить (примитивные типы, default-impl достаточна)
+
+### 4. `rapira/src/primitive.rs` — проброс версии для Option, Result, tuples
+
+- **`Option<T>`** — пробрасывает version в `T::from_slice_versioned`
+- **`Result<T, E>`** — пробрасывает в T и E
+- **Tuples `(T1, T2, ...)`** — пробрасывает в каждый элемент
+- **`[T; N]`** — пробрасывает в каждый элемент
+- Примитивы (bool, u32, String и т.д.) — default-impl достаточна, ничего менять не надо
+
+### 5. `rapira/src/implements.rs` — optional deps
+
+- **`ArrayVec<T, N>`**, **`SmallVec`**, **`IndexMap`** — добавить from_slice_versioned с пробросом версии (аналогично Vec)
+
+### 6. `rapira-derive/src/field_attrs.rs` — парсинг `#[rapira(since = N)]`
+
+Добавить функцию `extract_since_attr` (аналогично `extract_with_attr`).
+
+### 7. `rapira-derive/src/attributes.rs` — парсинг `#[rapira(version = N)]`
+
+Добавить функцию `version_attr`.
+
+### 8. `rapira-derive/src/lib.rs` — передать attrs в struct_serializer
+
+Передать `&ast.attrs` в `struct_serializer`, чтобы макрос мог извлечь `version`.
+
+### 9. `rapira-derive/src/structs.rs` — генерация versioned кода
+
+Для `Fields::Named` и `Fields::Unnamed`, если есть `#[rapira(version = N)]`:
+
+**Генерируемый `from_slice_versioned`:**
+```rust
+fn from_slice_versioned(slice: &mut &[u8], version: u8) -> rapira::Result<Self> {
+    // v1 поля — читаются безусловно
+    let name = <String as rapira::Rapira>::from_slice_versioned(slice, version)?;
+    let age = <u32 as rapira::Rapira>::from_slice_versioned(slice, version)?;
+    // v2+ поля — условно
+    let email = if version >= 2 {
+        <Option<String> as rapira::Rapira>::from_slice_versioned(slice, version)?
+    } else {
+        Default::default()
+    };
+    Ok(Self { name, age, email })
+}
+```
+
+**`from_slice` не меняется** — всегда читает все поля (текущая версия).
+**`convert_to_bytes`, `size` не меняются** — всегда пишут все поля.
+**`STATIC_SIZE`, `MIN_SIZE` не меняются** — считаются по всем полям.
+
+### 10. Валидация (compile-time errors в макросе)
+
+- `#[rapira(since = N)]` без `#[rapira(version = M)]` на структуре → ошибка компиляции
+- `since > version` → ошибка
+- `since = 0` → ошибка
+- `since` + `skip` → ошибка
+
+### 11. Тесты — `rapira/tests/all.rs`
+
+```rust
+#[derive(Debug, PartialEq, Rapira)]
+#[rapira(version = 2)]
+struct UserV2 {
+    name: String,
+    age: u32,
+    #[rapira(since = 2)]
+    email: Option<String>,
+}
+
+#[test]
+fn test_versioned_roundtrip() {
+    let user = UserV2 { name: "Alice".into(), age: 30, email: Some("a@b.com".into()) };
+    let bytes = rapira::serialize(&user);
+    let deser: UserV2 = rapira::deserialize(&bytes).unwrap();
+    assert_eq!(user, deser);
+}
+
+#[test]
+fn test_versioned_backward_compat() {
+    // Симулируем v1 данные (name + age, без email)
+    let mut v1_bytes = Vec::new();
+    rapira::extend_vec(&"Alice".to_string(), &mut v1_bytes);
+    rapira::extend_vec(&30u32, &mut v1_bytes);
+
+    let user: UserV2 = rapira::deserialize_versioned(&v1_bytes, 1).unwrap();
+    assert_eq!(user.name, "Alice");
+    assert_eq!(user.age, 30);
+    assert_eq!(user.email, None); // Default
+}
+
+#[test]
+fn test_versioned_in_vec() {
+    // Vec<UserV2> с v1 данными
+    let mut v1_bytes = Vec::new();
+    rapira::extend_vec(&2u32, &mut v1_bytes); // count = 2
+    rapira::extend_vec(&"Alice".to_string(), &mut v1_bytes);
+    rapira::extend_vec(&30u32, &mut v1_bytes);
+    rapira::extend_vec(&"Bob".to_string(), &mut v1_bytes);
+    rapira::extend_vec(&25u32, &mut v1_bytes);
+
+    let users: Vec<UserV2> = rapira::deserialize_versioned(&v1_bytes, 1).unwrap();
+    assert_eq!(users.len(), 2);
+    assert_eq!(users[0].email, None);
+    assert_eq!(users[1].email, None);
+}
+```
+
+## Что НЕ меняется
+
+- Wire format (формат байтов) — полностью обратно совместим
+- Сериализация (`convert_to_bytes`, `size`) — всегда пишет все поля
+- `from_slice` — всегда читает все поля (как раньше)
+- Структуры без `#[rapira(version)]` — код идентичен текущему
+- Примитивные типы — default-impl `from_slice_versioned` вызывает `from_slice`
+
+## Порядок реализации
+
+1. Трейт: добавить `from_slice_versioned` с default-impl → `rapira/src/lib.rs`
+2. Функция `deserialize_versioned` → `rapira/src/funcs.rs`
+3. Проброс версии в коллекциях → `allocated.rs`, `primitive.rs`, `implements.rs`
+4. Парсинг атрибутов → `field_attrs.rs`, `attributes.rs`
+5. Передача attrs → `rapira-derive/src/lib.rs`
+6. Генерация versioned кода → `structs.rs`
+7. Тесты → `rapira/tests/all.rs`
+
+## Верификация
+
+```bash
+cargo test                    # все существующие тесты проходят
+cargo test test_versioned     # новые тесты для versioning
+cargo check                   # нет ошибок компиляции
+cargo fmt                     # форматирование
+```
+
+
+If you need specific details from before exiting plan mode (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/railka/.claude/projects/-Users-railka-libfunc-rapira/daf4df12-0c0b-4fcd-bb5d-f2caa440790c.jsonl
+
+---
+
+добавь документацию по использованию в lib.rs
+
+---
+
+добавь так же реализацию для ecow::EcoVec и indexmap. и проверь под feature флагами для всех внешних зависимостей:
+- arrayvec
+- smallvec
+- ecow::EcoVec
+- indexmap
+
+---
+
+## Context
+
+- Current git status: On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   Cargo.lock
+	modified:   rapira-derive/src/attributes.rs
+	modified:   rapira-derive/src/field_attrs.rs
+	modified:   rapira-derive/src/lib.rs
+	modified:   rapira-derive/src/structs.rs
+	modified:   rapira/Cargo.toml
+	modified:   rapira/src/allocated.rs
+	modified:   rapira/src/funcs.rs
+	modified:   rapira/src/implements.rs
+	modified:   rapira/src/lib.rs
+	modified:   rapira/src/primitive.rs
+	modified:   rapira/tests/all.rs
+- Current git diff (staged and unstaged changes): <persisted-output>
+Output too large (33.7KB). Full output saved to: /Users/railka/.REDACTED.txt
+
+Preview (first 2KB):
+diff --git a/Cargo.lock b/Cargo.lock
+index 2cf02cb..25c7467 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -756,7 +756,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "rapira"
+-version = "0.12.3"
++version = "0.12.4"
+ dependencies = [
+  "arrayvec",
+  "bytemuck",
+diff --git a/rapira-derive/src/attributes.rs b/rapira-derive/src/attributes.rs
+index 1f97f12..fa1f340 100644
+--- a/rapira-derive/src/attributes.rs
++++ b/rapira-derive/src/attributes.rs
+@@ -45,6 +45,30 @@ pub fn min_size(attrs: &[Attribute]) -> Option<Expr> {
+     })
+ }
+ 
++/// `#[rapira(version = 2)]` on struct
++pub fn version_attr(attrs: &[Attribute]) -> Option<u8> {
++    attrs.iter().find_map(|attr| {
++        if !attr.path().is_ident("rapira") {
++            return None;
++        }
++
++        if let Ok(nv) = attr.parse_args::<MetaNameValue>() {
++            if nv.path.is_ident("version") {
++                if let Expr::Lit(syn::ExprLit {
++                    lit: syn::Lit::Int(i),
++                    ..
++                }) = &nv.value
++                {
++                    return Some(i.base10_parse::<u8>().expect("version value must be u8"));
++                }
++                panic!("version value must be an integer literal");
++            }
++        }
++
++        None
++    })
++}
++
+ /// `#[rapira(debug)]`
+ pub fn debug_attr(attrs: &[Attribute]) -> bool {
+     for item in attrs.iter() {
+diff --git a/rapira-derive/src/field_attrs.rs b/rapira-derive/src/field_attrs.rs
+index ae45db9..c699424 100644
+--- a/rapira-derive/src/field_attrs.rs
++++ b/rapira-derive/src/field_attrs.rs
+@@ -47,6 +47,30 @@ pub fn extract_with_attr(attrs: &[Attribute]) -> Option<ExprPath> {
+     })
+ }
+ 
++/// `#[rapira(since = 2)]` in fields
++pub fn extract_since_attr(attrs: &[Attribute]) -> Option<u8> {
++    attrs.iter().find_map(|attr| {
++        if !attr.path().is_ident("rapira") {
++            return None;
++        }
++
++        let Ok(nv) = attr.parse_args::<MetaNameValue>() else {
++            return None;
++        };
++
+...
+</persisted-output>
+- Current branch: main
+- Recent commits: bb38e1b add AI files
+084f9fa up deps
+5d5e919 add AI files
+f8679b8 update fjall
+c93b9eb downgrade fjall
+59b8b35 fjall 3.0.0-pre.6
+eb45f65 update deps
+2f2be06 add write_to_array
+f9d0acb fix .rules
+bcb812d add .rules symlinks
+
+## Your task
+
+Based on the above changes, create a single git commit.
+
+You have the capability to call multiple tools in a single response. Stage and create the commit using a single message. Do not use any other tools or do anything else. Do not send any other text or messages besides these tool calls.

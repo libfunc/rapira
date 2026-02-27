@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "56dbbf072fdc",
+  "session_id": "201fd703-096f-4625-83c6-559116228dc4",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-27T11:34:25.127121Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "rapira-derive/src/attributes.rs",
+    "rapira-derive/src/field_attrs.rs",
+    "rapira-derive/src/lib.rs",
+    "rapira-derive/src/structs.rs",
+    "rapira/src/allocated.rs",
+    "rapira/src/funcs.rs",
+    "rapira/src/implements.rs",
+    "rapira/src/lib.rs",
+    "rapira/src/primitive.rs",
+    "rapira/tests/all.rs"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "69f76534f12d",
+  "token_usage": {
+    "input_tokens": 92,
+    "cache_creation_tokens": 112150,
+    "cache_read_tokens": 5620034,
+    "output_tokens": 34792,
+    "api_call_count": 57
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-27T11:34:24.711408Z",
+    "agent_lines": 675,
+    "human_added": 2,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 677,
+    "agent_percentage": 99.70457902511079
+  },
+  "transcript_path": ".claude/projects/-Users-railka-libfunc-rapira/201fd703-096f-4625-83c6-559116228dc4.jsonl"
+}

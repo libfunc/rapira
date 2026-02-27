@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "56dbbf072fdc",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "rapira-derive/src/attributes.rs",
+    "rapira-derive/src/field_attrs.rs",
+    "rapira-derive/src/lib.rs",
+    "rapira-derive/src/structs.rs",
+    "rapira/src/allocated.rs",
+    "rapira/src/funcs.rs",
+    "rapira/src/implements.rs",
+    "rapira/src/lib.rs",
+    "rapira/src/primitive.rs",
+    "rapira/tests/all.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/56/dbbf072fdc/0/metadata.json",
+      "transcript": "/56/dbbf072fdc/0/full.jsonl",
+      "context": "/56/dbbf072fdc/0/context.md",
+      "content_hash": "/56/dbbf072fdc/0/content_hash.txt",
+      "prompt": "/56/dbbf072fdc/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 92,
+    "cache_creation_tokens": 112150,
+    "cache_read_tokens": 5620034,
+    "output_tokens": 34792,
+    "api_call_count": 57
+  }
+}
