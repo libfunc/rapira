@@ -4,10 +4,11 @@ extern crate syn;
 
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{DataStruct, ExprPath, Field, Fields, Generics, LitInt};
+use syn::{Attribute, DataStruct, ExprPath, Field, Fields, Generics, LitInt};
 
 use crate::{
-    field_attrs::{extract_idx_attr, extract_with_attr, skip_attr},
+    attributes,
+    field_attrs::{extract_idx_attr, extract_since_attr, extract_with_attr, skip_attr},
     shared::build_ident,
 };
 
@@ -16,14 +17,16 @@ pub fn struct_serializer(
     name: &Ident,
     generics: Generics,
     is_debug: bool,
+    attrs: &[Attribute],
 ) -> proc_macro::TokenStream {
+    let struct_version = attributes::version_attr(attrs);
     let fields = &data_struct.fields;
     match fields {
         Fields::Named(fields) => {
             let named = &fields.named;
             let named_len = named.len();
 
-            let mut fields_insert: Vec<(Field, u32, Option<ExprPath>)> =
+            let mut fields_insert: Vec<(Field, u32, Option<ExprPath>, Option<u8>)> =
                 Vec::with_capacity(named_len);
             let mut seq = 0u32;
 
@@ -37,14 +40,48 @@ pub fn struct_serializer(
                 });
 
                 let field_with_attr = extract_with_attr(&field.attrs);
+                let field_since = extract_since_attr(&field.attrs);
 
-                fields_insert.push((field.clone(), field_idx, field_with_attr));
+                // Validate since attr
+                if let Some(since) = field_since {
+                    if struct_version.is_none() {
+                        panic!(
+                            "field `{}` has #[rapira(since = {})] but struct `{}` is missing #[rapira(version = N)]",
+                            field.ident.as_ref().unwrap(),
+                            since,
+                            name
+                        );
+                    }
+                    if since == 0 {
+                        panic!(
+                            "field `{}`: #[rapira(since = 0)] is invalid, versions start at 1",
+                            field.ident.as_ref().unwrap()
+                        );
+                    }
+                    if since > struct_version.unwrap() {
+                        panic!(
+                            "field `{}`: #[rapira(since = {})] exceeds struct version {}",
+                            field.ident.as_ref().unwrap(),
+                            since,
+                            struct_version.unwrap()
+                        );
+                    }
+                    if skip_attr(&field.attrs) {
+                        panic!(
+                            "field `{}`: #[rapira(since)] and #[rapira(skip)] cannot be combined",
+                            field.ident.as_ref().unwrap()
+                        );
+                    }
+                }
+
+                fields_insert.push((field.clone(), field_idx, field_with_attr, field_since));
             }
 
-            fields_insert.sort_by(|(_, idx_a, _), (_, idx_b, _)| idx_a.cmp(idx_b));
+            fields_insert.sort_by(|(_, idx_a, _, _), (_, idx_b, _, _)| idx_a.cmp(idx_b));
 
             let mut field_names: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut from_slice: Vec<TokenStream> = Vec::with_capacity(named_len);
+            let mut from_slice_versioned: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut debug_from_slice: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut from_slice_unchecked: Vec<TokenStream> = Vec::with_capacity(named_len);
@@ -55,11 +92,50 @@ pub fn struct_serializer(
             let mut static_sizes: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut min_size: Vec<TokenStream> = Vec::with_capacity(named_len);
 
-            for (field, _, with_attr) in fields_insert.iter() {
+            for (field, _, with_attr, since) in fields_insert.iter() {
                 let ident = field.ident.as_ref().unwrap();
                 let typ = &field.ty;
 
                 field_names.push(quote! { #ident, });
+
+                // Generate from_slice_versioned entry
+                if let Some(since_val) = since {
+                    // Field with since attr — conditionally read based on version
+                    match with_attr {
+                        Some(with_attr) => {
+                            from_slice_versioned.push(quote! {
+                                let #ident: #typ = if version >= #since_val {
+                                    #with_attr::from_slice(slice)?
+                                } else {
+                                    Default::default()
+                                };
+                            });
+                        }
+                        None => {
+                            from_slice_versioned.push(quote! {
+                                let #ident: #typ = if version >= #since_val {
+                                    <#typ as rapira::Rapira>::from_slice_versioned(slice, version)?
+                                } else {
+                                    Default::default()
+                                };
+                            });
+                        }
+                    }
+                } else {
+                    // Field without since — always read, propagate version
+                    match with_attr {
+                        Some(with_attr) => {
+                            from_slice_versioned.push(quote! {
+                                let #ident: #typ = #with_attr::from_slice(slice)?;
+                            });
+                        }
+                        None => {
+                            from_slice_versioned.push(quote! {
+                                let #ident = <#typ as rapira::Rapira>::from_slice_versioned(slice, version)?;
+                            });
+                        }
+                    }
+                }
 
                 match with_attr {
                     Some(with_attr) => {
@@ -170,6 +246,24 @@ pub fn struct_serializer(
                 quote!()
             };
 
+            // Only generate from_slice_versioned override if struct has version attr
+            let versioned_method = if struct_version.is_some() {
+                quote! {
+                    #[inline]
+                    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> rapira::Result<Self>
+                    where
+                        Self: Sized,
+                    {
+                        #(#from_slice_versioned)*
+                        Ok(#name {
+                            #(#field_names)*
+                        })
+                    }
+                }
+            } else {
+                quote!()
+            };
+
             let res = quote! {
                 #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
@@ -185,6 +279,8 @@ pub fn struct_serializer(
                             #(#field_names)*
                         })
                     }
+
+                    #versioned_method
 
                     #debug_parse
 
@@ -243,6 +339,7 @@ pub fn struct_serializer(
             let unnamed_len = unnamed.len();
             let mut field_names: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut from_slice: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
+            let mut from_slice_versioned: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut debug_from_slice: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut check_bytes: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut from_slice_unchecked: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
@@ -259,8 +356,70 @@ pub fn struct_serializer(
                 let field_name = syn::Ident::new(&format!("arg{idx}"), Span::call_site());
                 let field_name_into = quote! { #field_name, };
                 let with_attr = extract_with_attr(&field.attrs);
+                let since = extract_since_attr(&field.attrs);
+
+                // Validate since attr for unnamed fields
+                if let Some(since_val) = since {
+                    if struct_version.is_none() {
+                        panic!(
+                            "unnamed field {} has #[rapira(since = {})] but struct `{}` is missing #[rapira(version = N)]",
+                            idx, since_val, name
+                        );
+                    }
+                    if since_val == 0 {
+                        panic!(
+                            "unnamed field {}: #[rapira(since = 0)] is invalid, versions start at 1",
+                            idx
+                        );
+                    }
+                    if since_val > struct_version.unwrap() {
+                        panic!(
+                            "unnamed field {}: #[rapira(since = {})] exceeds struct version {}",
+                            idx,
+                            since_val,
+                            struct_version.unwrap()
+                        );
+                    }
+                }
 
                 field_names.push(field_name_into);
+
+                // Generate from_slice_versioned entry
+                if let Some(since_val) = since {
+                    match &with_attr {
+                        Some(with_attr) => {
+                            from_slice_versioned.push(quote! {
+                                let #field_name: #typ = if version >= #since_val {
+                                    #with_attr::from_slice(slice)?
+                                } else {
+                                    Default::default()
+                                };
+                            });
+                        }
+                        None => {
+                            from_slice_versioned.push(quote! {
+                                let #field_name: #typ = if version >= #since_val {
+                                    <#typ as rapira::Rapira>::from_slice_versioned(slice, version)?
+                                } else {
+                                    Default::default()
+                                };
+                            });
+                        }
+                    }
+                } else {
+                    match &with_attr {
+                        Some(with_attr) => {
+                            from_slice_versioned.push(quote! {
+                                let #field_name: #typ = #with_attr::from_slice(slice)?;
+                            });
+                        }
+                        None => {
+                            from_slice_versioned.push(quote! {
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_versioned(slice, version)?;
+                            });
+                        }
+                    }
+                }
 
                 match with_attr {
                     Some(with_attr) => {
@@ -369,6 +528,21 @@ pub fn struct_serializer(
                 quote!()
             };
 
+            let versioned_method = if struct_version.is_some() {
+                quote! {
+                    #[inline]
+                    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> rapira::Result<Self>
+                    where
+                        Self: Sized,
+                    {
+                        #(#from_slice_versioned)*
+                        Ok(#name(#(#field_names)*))
+                    }
+                }
+            } else {
+                quote!()
+            };
+
             let res = quote! {
                 #name_with_generics {
                     const STATIC_SIZE: Option<usize> = rapira::static_size([#(#static_sizes)*]);
@@ -382,6 +556,8 @@ pub fn struct_serializer(
                         #(#from_slice)*
                         Ok(#name(#(#field_names)*))
                     }
+
+                    #versioned_method
 
                     #debug_parse
 

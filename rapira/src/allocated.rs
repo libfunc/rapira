@@ -168,6 +168,33 @@ impl<T: Rapira> Rapira for Vec<T> {
     }
 
     #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let len = u32::from_slice(slice)? as usize;
+
+        if len > VEC_MAX_CAP {
+            return Err(RapiraError::MaxCapacity);
+        }
+
+        let size = core::mem::size_of::<Vec<T>>() * len;
+
+        if size > VEC_MAX_SIZE_OF {
+            return Err(RapiraError::MaxSize);
+        }
+
+        let mut vec: Vec<T> = Vec::with_capacity(len);
+
+        for _ in 0..len {
+            let val = T::from_slice_versioned(slice, version)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
     unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
@@ -233,6 +260,15 @@ impl<T: Rapira> Rapira for Box<T> {
         Self: Sized,
     {
         let t = T::from_slice(slice)?;
+        Ok(Box::new(t))
+    }
+
+    #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t = T::from_slice_versioned(slice, version)?;
         Ok(Box::new(t))
     }
 
@@ -326,6 +362,18 @@ where
         for _ in 0..len {
             let key = K::from_slice(slice)?;
             let value = V::from_slice(slice)?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+
+    #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self> {
+        let len = u32::from_slice(slice)? as usize;
+        let mut map = BTreeMap::<K, V>::new();
+        for _ in 0..len {
+            let key = K::from_slice_versioned(slice, version)?;
+            let value = V::from_slice_versioned(slice, version)?;
             map.insert(key, value);
         }
         Ok(map)

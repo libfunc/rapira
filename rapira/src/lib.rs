@@ -23,7 +23,9 @@ pub use primitive::{byte_rapira, bytes_rapira, str_rapira};
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-pub use funcs::{check_bytes, deser_unchecked, deser_unsafe, deserialize, size};
+pub use funcs::{
+    check_bytes, deser_unchecked, deser_unsafe, deserialize, deserialize_versioned, size,
+};
 #[cfg(feature = "alloc")]
 pub use funcs::{extend_vec, serialize};
 pub use rapira_derive::{FromU8, PrimitiveFromEnum, Rapira};
@@ -75,6 +77,61 @@ pub trait Rapira {
     ///
     /// This is unsafe, but maybe safe after check_bytes fn
     unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Self::from_slice(slice)
+    }
+
+    /// Deserialize with schema version awareness.
+    ///
+    /// Enables backward-compatible deserialization: new code can read old data
+    /// that is missing fields added in later versions. The version number is
+    /// stored **externally** (e.g. in DB metadata), not inside the serialized bytes.
+    ///
+    /// Default implementation delegates to [`from_slice`](Rapira::from_slice).
+    /// The derive macro generates an override when `#[rapira(version = N)]` is
+    /// placed on a struct — fields annotated with `#[rapira(since = M)]` are
+    /// only read from the slice when `version >= M`, otherwise
+    /// [`Default::default()`] is used.
+    ///
+    /// # Derive usage
+    ///
+    /// ```rust,ignore
+    /// #[derive(Rapira)]
+    /// #[rapira(version = 2)]
+    /// struct User {
+    ///     name: String,           // present since v1 (no attribute needed)
+    ///     age: u32,               // present since v1
+    ///     #[rapira(since = 2)]
+    ///     email: Option<String>,  // added in v2, defaults to None for v1 data
+    /// }
+    /// ```
+    ///
+    /// # Reading old data
+    ///
+    /// ```rust,ignore
+    /// // version comes from DB metadata, not from the bytes themselves
+    /// let user: User = rapira::deserialize_versioned(&bytes, schema_version)?;
+    /// ```
+    ///
+    /// # Rules
+    ///
+    /// - Serialization (`convert_to_bytes`, `size`) always writes **all** fields
+    ///   (current version). Only deserialization is affected.
+    /// - `from_slice` always reads all fields regardless of version (use for
+    ///   current-version data).
+    /// - Fields with `#[rapira(since = M)]` must implement [`Default`].
+    /// - `since = 0` is invalid (versions start at 1).
+    /// - `since` value must not exceed the struct's `version`.
+    /// - `#[rapira(since)]` requires `#[rapira(version)]` on the struct.
+    /// - `#[rapira(since)]` and `#[rapira(skip)]` cannot be combined.
+    /// - Structs without `#[rapira(version)]` use the default impl (delegates
+    ///   to `from_slice`), so existing code is unaffected.
+    /// - Version is propagated through collections (`Vec<T>`, `Option<T>`,
+    ///   `Box<T>`, `BTreeMap`, tuples, arrays, `SmallVec`, `ArrayVec`).
+    #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], _version: u8) -> Result<Self>
     where
         Self: Sized,
     {

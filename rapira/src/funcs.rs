@@ -94,6 +94,15 @@ where
     T::from_slice(&mut bytes)
 }
 
+/// Deserialize with schema version awareness.
+/// Version is stored externally (e.g. in DB metadata), not in the serialized data.
+pub fn deserialize_versioned<T>(mut bytes: &[u8], version: u8) -> Result<T>
+where
+    T: Rapira + Sized,
+{
+    T::from_slice_versioned(&mut bytes, version)
+}
+
 /// # Safety
 ///
 /// NOT check oversize vec and other items with capacity initialization

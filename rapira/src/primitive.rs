@@ -689,6 +689,20 @@ impl<T: Rapira> Rapira for Option<T> {
     }
 
     #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let b = byte_rapira::from_slice(slice)?;
+        if b != 0 {
+            let t = T::from_slice_versioned(slice, version)?;
+            Ok(Some(t))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[inline]
     fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
@@ -793,6 +807,19 @@ impl<T: Rapira, E: Rapira> Rapira for Result<T, E> {
         match discriminant {
             0 => Ok(Ok(T::from_slice(slice)?)),
             1 => Ok(Err(E::from_slice(slice)?)),
+            _ => Err(RapiraError::EnumVariant),
+        }
+    }
+
+    #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let discriminant = byte_rapira::from_slice(slice)?;
+        match discriminant {
+            0 => Ok(Ok(T::from_slice_versioned(slice, version)?)),
+            1 => Ok(Err(E::from_slice_versioned(slice, version)?)),
             _ => Err(RapiraError::EnumVariant),
         }
     }
@@ -1064,6 +1091,38 @@ where
     }
 
     #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut arr: [MaybeUninit<T>; CAP] = unsafe { MaybeUninit::uninit().assume_init() };
+
+        for i in 0..CAP {
+            match T::from_slice_versioned(slice, version) {
+                Ok(val) => {
+                    arr.get_mut(i).ok_or(RapiraError::SliceLen)?.write(val);
+                }
+                Err(err) => {
+                    if i != 0 {
+                        let s = arr.get_mut(0..i).ok_or(RapiraError::SliceLen)?;
+
+                        for item in s {
+                            unsafe {
+                                item.assume_init_drop();
+                            }
+                        }
+                    }
+                    return Err(err);
+                }
+            }
+        }
+
+        let arr: [T; CAP] = arr.map(|i| unsafe { i.assume_init() });
+
+        Ok(arr)
+    }
+
+    #[inline]
     unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> Result<Self>
     where
         Self: Sized,
@@ -1152,6 +1211,16 @@ impl<T0: Rapira, T1: Rapira> Rapira for (T0, T1) {
     }
 
     #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice_versioned(slice, version)?;
+        let t1 = T1::from_slice_versioned(slice, version)?;
+        Ok((t0, t1))
+    }
+
+    #[inline]
     fn check_bytes(slice: &mut &[u8]) -> Result<()>
     where
         Self: Sized,
@@ -1225,6 +1294,17 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira> Rapira for (T0, T1, T2) {
         let t0 = T0::from_slice(slice)?;
         let t1 = T1::from_slice(slice)?;
         let t2 = T2::from_slice(slice)?;
+        Ok((t0, t1, t2))
+    }
+
+    #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice_versioned(slice, version)?;
+        let t1 = T1::from_slice_versioned(slice, version)?;
+        let t2 = T2::from_slice_versioned(slice, version)?;
         Ok((t0, t1, t2))
     }
 
@@ -1313,6 +1393,18 @@ impl<T0: Rapira, T1: Rapira, T2: Rapira, T3: Rapira> Rapira for (T0, T1, T2, T3)
         let t1 = T1::from_slice(slice)?;
         let t2 = T2::from_slice(slice)?;
         let t3 = T3::from_slice(slice)?;
+        Ok((t0, t1, t2, t3))
+    }
+
+    #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let t0 = T0::from_slice_versioned(slice, version)?;
+        let t1 = T1::from_slice_versioned(slice, version)?;
+        let t2 = T2::from_slice_versioned(slice, version)?;
+        let t3 = T3::from_slice_versioned(slice, version)?;
         Ok((t0, t1, t2, t3))
     }
 

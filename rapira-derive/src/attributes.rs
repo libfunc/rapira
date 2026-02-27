@@ -45,6 +45,30 @@ pub fn min_size(attrs: &[Attribute]) -> Option<Expr> {
     })
 }
 
+/// `#[rapira(version = 2)]` on struct
+pub fn version_attr(attrs: &[Attribute]) -> Option<u8> {
+    attrs.iter().find_map(|attr| {
+        if !attr.path().is_ident("rapira") {
+            return None;
+        }
+
+        if let Ok(nv) = attr.parse_args::<MetaNameValue>() {
+            if nv.path.is_ident("version") {
+                if let Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Int(i),
+                    ..
+                }) = &nv.value
+                {
+                    return Some(i.base10_parse::<u8>().expect("version value must be u8"));
+                }
+                panic!("version value must be an integer literal");
+            }
+        }
+
+        None
+    })
+}
+
 /// `#[rapira(debug)]`
 pub fn debug_attr(attrs: &[Attribute]) -> bool {
     for item in attrs.iter() {

@@ -26,6 +26,8 @@ use syn::{Data, DeriveInput, Fields, Ident, parse_macro_input};
 /// - `#[rapira(with = path)]`
 /// - `#[rapira(skip)]`
 /// - `#[rapira(debug)]`
+/// - `#[rapira(version = N)]` - on struct: enable versioned deserialization
+/// - `#[rapira(since = N)]` - on field: field added in version N (requires version on struct)
 #[proc_macro_derive(Rapira, attributes(rapira, idx, primitive))]
 pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(stream as DeriveInput);
@@ -34,7 +36,9 @@ pub fn serializer_trait(stream: proc_macro::TokenStream) -> proc_macro::TokenStr
     let is_debug = attributes::debug_attr(&ast.attrs);
 
     match data {
-        Data::Struct(data_struct) => struct_serializer(data_struct, name, ast.generics, is_debug),
+        Data::Struct(data_struct) => {
+            struct_serializer(data_struct, name, ast.generics, is_debug, &ast.attrs)
+        }
         Data::Enum(data_enum) => {
             let is_simple_enum = data_enum.variants.iter().all(|item| item.fields.is_empty());
             if is_simple_enum {

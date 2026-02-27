@@ -47,6 +47,30 @@ pub fn extract_with_attr(attrs: &[Attribute]) -> Option<ExprPath> {
     })
 }
 
+/// `#[rapira(since = 2)]` in fields
+pub fn extract_since_attr(attrs: &[Attribute]) -> Option<u8> {
+    attrs.iter().find_map(|attr| {
+        if !attr.path().is_ident("rapira") {
+            return None;
+        }
+
+        let Ok(nv) = attr.parse_args::<MetaNameValue>() else {
+            return None;
+        };
+
+        if !nv.path.is_ident("since") {
+            return None;
+        }
+
+        match &nv.value {
+            Expr::Lit(ExprLit {
+                lit: Lit::Int(i), ..
+            }) => Some(i.base10_parse::<u8>().expect("since value must be u8")),
+            _ => panic!("since value must be an integer literal"),
+        }
+    })
+}
+
 /// `#[rapira(skip)]` in fields
 pub fn skip_attr(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|attr| {

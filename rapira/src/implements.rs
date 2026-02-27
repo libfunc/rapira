@@ -40,6 +40,23 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for arrayvec::ArrayVec<T,
     }
 
     #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let len = usize::from_slice(slice)?;
+        if len > CAP {
+            return Err(crate::RapiraError::SliceLen);
+        }
+        let mut vec = Self::new_const();
+        for _ in 0..len {
+            let val = T::from_slice_versioned(slice, version)?;
+            vec.push(val);
+        }
+        Ok(vec)
+    }
+
+    #[inline]
     unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> crate::Result<Self>
     where
         Self: Sized,
@@ -211,6 +228,35 @@ impl<T: crate::Rapira, const CAP: usize> crate::Rapira for smallvec::SmallVec<[T
 
         for _ in 0..len {
             let val = T::from_slice(slice)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF};
+
+        let len = u32::from_slice(slice)? as usize;
+
+        if len > SMALLVEC_MAX_CAP {
+            return Err(crate::RapiraError::MaxCapacity);
+        }
+
+        let size = std::mem::size_of::<Self>() * len;
+
+        if size > SMALLVEC_MAX_SIZE_OF {
+            return Err(crate::RapiraError::MaxSize);
+        }
+
+        let mut vec = Self::with_capacity(len);
+
+        for _ in 0..len {
+            let val = T::from_slice_versioned(slice, version)?;
             vec.push(val);
         }
 
@@ -1376,6 +1422,35 @@ where
     }
 
     #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::max_cap::{SMALLVEC_MAX_CAP, SMALLVEC_MAX_SIZE_OF};
+
+        let len = u32::from_slice(slice)? as usize;
+
+        if len > SMALLVEC_MAX_CAP {
+            return Err(crate::RapiraError::MaxCapacity);
+        }
+
+        let size = std::mem::size_of::<Self>() * len;
+
+        if size > SMALLVEC_MAX_SIZE_OF {
+            return Err(crate::RapiraError::MaxSize);
+        }
+
+        let mut vec = Self::with_capacity(len);
+
+        for _ in 0..len {
+            let val = T::from_slice_versioned(slice, version)?;
+            vec.push(val);
+        }
+
+        Ok(vec)
+    }
+
+    #[inline]
     unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> crate::Result<Self>
     where
         Self: Sized,
@@ -1494,6 +1569,34 @@ where
         for _ in 0..len {
             let key = K::from_slice(slice)?;
             let value = V::from_slice(slice)?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+
+    #[inline]
+    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        use crate::max_cap::{VEC_MAX_CAP, VEC_MAX_SIZE_OF};
+
+        let len = u32::from_slice(slice)? as usize;
+
+        if len > VEC_MAX_CAP {
+            return Err(crate::RapiraError::MaxCapacity);
+        }
+
+        let size = std::mem::size_of::<Self>() * len;
+
+        if size > VEC_MAX_SIZE_OF {
+            return Err(crate::RapiraError::MaxSize);
+        }
+
+        let mut map = Self::with_capacity_and_hasher(len, Default::default());
+        for _ in 0..len {
+            let key = K::from_slice_versioned(slice, version)?;
+            let value = V::from_slice_versioned(slice, version)?;
             map.insert(key, value);
         }
         Ok(map)

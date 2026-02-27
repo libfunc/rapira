@@ -213,3 +213,133 @@ fn test_postcard_fields() -> Result<()> {
 
     Ok(())
 }
+
+// --- Versioned deserialization tests ---
+
+#[derive(Debug, PartialEq, Rapira)]
+#[rapira(version = 2)]
+struct UserV2 {
+    name: String,
+    age: u32,
+    #[rapira(since = 2)]
+    email: Option<String>,
+}
+
+#[test]
+fn test_versioned_roundtrip() {
+    let user = UserV2 {
+        name: "Alice".into(),
+        age: 30,
+        email: Some("a@b.com".into()),
+    };
+    let bytes = rapira::serialize(&user);
+    // from_slice reads all fields (current version)
+    let deser: UserV2 = rapira::deserialize(&bytes).unwrap();
+    assert_eq!(user, deser);
+    // deserialize_versioned with current version also reads all fields
+    let deser: UserV2 = rapira::deserialize_versioned(&bytes, 2).unwrap();
+    assert_eq!(user, deser);
+}
+
+#[test]
+fn test_versioned_backward_compat() {
+    // Simulate v1 data (name + age, no email)
+    let mut v1_bytes = Vec::new();
+    rapira::extend_vec(&"Alice".to_string(), &mut v1_bytes);
+    rapira::extend_vec(&30u32, &mut v1_bytes);
+
+    let user: UserV2 = rapira::deserialize_versioned(&v1_bytes, 1).unwrap();
+    assert_eq!(user.name, "Alice");
+    assert_eq!(user.age, 30);
+    assert_eq!(user.email, None); // Default
+}
+
+#[test]
+fn test_versioned_in_vec() {
+    // Vec<UserV2> with v1 data
+    let mut v1_bytes = Vec::new();
+    rapira::extend_vec(&2u32, &mut v1_bytes); // count = 2
+    rapira::extend_vec(&"Alice".to_string(), &mut v1_bytes);
+    rapira::extend_vec(&30u32, &mut v1_bytes);
+    rapira::extend_vec(&"Bob".to_string(), &mut v1_bytes);
+    rapira::extend_vec(&25u32, &mut v1_bytes);
+
+    let users: Vec<UserV2> = rapira::deserialize_versioned(&v1_bytes, 1).unwrap();
+    assert_eq!(users.len(), 2);
+    assert_eq!(users[0].name, "Alice");
+    assert_eq!(users[0].age, 30);
+    assert_eq!(users[0].email, None);
+    assert_eq!(users[1].name, "Bob");
+    assert_eq!(users[1].age, 25);
+    assert_eq!(users[1].email, None);
+}
+
+#[derive(Debug, PartialEq, Rapira)]
+#[rapira(version = 3)]
+struct UserV3 {
+    name: String,
+    age: u32,
+    #[rapira(since = 2)]
+    email: Option<String>,
+    #[rapira(since = 3)]
+    score: u64,
+}
+
+#[test]
+fn test_versioned_multi_versions() {
+    // v1 data: only name + age
+    let mut v1_bytes = Vec::new();
+    rapira::extend_vec(&"Alice".to_string(), &mut v1_bytes);
+    rapira::extend_vec(&30u32, &mut v1_bytes);
+
+    let user: UserV3 = rapira::deserialize_versioned(&v1_bytes, 1).unwrap();
+    assert_eq!(user.name, "Alice");
+    assert_eq!(user.age, 30);
+    assert_eq!(user.email, None);
+    assert_eq!(user.score, 0);
+
+    // v2 data: name + age + email
+    let mut v2_bytes = Vec::new();
+    rapira::extend_vec(&"Bob".to_string(), &mut v2_bytes);
+    rapira::extend_vec(&25u32, &mut v2_bytes);
+    rapira::extend_vec(&Some("bob@test.com".to_string()), &mut v2_bytes);
+
+    let user: UserV3 = rapira::deserialize_versioned(&v2_bytes, 2).unwrap();
+    assert_eq!(user.name, "Bob");
+    assert_eq!(user.age, 25);
+    assert_eq!(user.email, Some("bob@test.com".into()));
+    assert_eq!(user.score, 0);
+
+    // v3 data (full): roundtrip
+    let user = UserV3 {
+        name: "Charlie".into(),
+        age: 35,
+        email: Some("charlie@test.com".into()),
+        score: 100,
+    };
+    let bytes = rapira::serialize(&user);
+    let deser: UserV3 = rapira::deserialize_versioned(&bytes, 3).unwrap();
+    assert_eq!(user, deser);
+}
+
+#[derive(Debug, PartialEq, Rapira)]
+#[rapira(version = 1)]
+struct NoSinceFields {
+    name: String,
+    age: u32,
+}
+
+#[test]
+fn test_versioned_no_since_fields() {
+    // Struct with version but no since fields - behaves like normal
+    let item = NoSinceFields {
+        name: "Test".into(),
+        age: 42,
+    };
+    let bytes = rapira::serialize(&item);
+    let deser: NoSinceFields = rapira::deserialize(&bytes).unwrap();
+    assert_eq!(item, deser);
+
+    let deser: NoSinceFields = rapira::deserialize_versioned(&bytes, 1).unwrap();
+    assert_eq!(item, deser);
+}
