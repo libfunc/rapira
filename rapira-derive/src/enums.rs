@@ -174,14 +174,14 @@ pub fn enum_serializer(
                                 #with_attr::convert_to_bytes(#field_name, slice, cursor);
                             });
                             fields_convert_to_bytes_ctx.push(quote! {
-                                #with_attr::convert_to_bytes_ctx(#field_name, slice, cursor, flags);
+                                #with_attr::convert_to_bytes(#field_name, slice, cursor);
                             });
                             fields_from_slice_ctx.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice_ctx(slice, flags)?;
+                                let #field_name: #typ = #with_attr::from_slice(slice)?;
                             });
                             fields_size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
                                 Some(s) => s,
-                                None => #with_attr::size_ctx(#field_name, flags)
+                                None => #with_attr::size(#field_name)
                             }) });
                         }
                         None => {
@@ -401,14 +401,14 @@ pub fn enum_serializer(
                                 #with_attr::convert_to_bytes(#field_name, slice, cursor);
                             });
                             fields_convert_to_bytes_ctx.push(quote! {
-                                #with_attr::convert_to_bytes_ctx(#field_name, slice, cursor, flags);
+                                #with_attr::convert_to_bytes(#field_name, slice, cursor);
                             });
                             fields_from_slice_ctx.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice_ctx(slice, flags)?;
+                                let #field_name: #typ = #with_attr::from_slice(slice)?;
                             });
                             fields_size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
                                 Some(s) => s,
-                                None => #with_attr::size_ctx(#field_name, flags)
+                                None => #with_attr::size(#field_name)
                             }) });
                         }
                         None => {

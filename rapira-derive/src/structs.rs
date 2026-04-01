@@ -183,14 +183,14 @@ pub fn struct_serializer(
                             #with_attr::convert_to_bytes(&self.#ident, slice, cursor);
                         });
                         convert_to_bytes_ctx.push(quote! {
-                            #with_attr::convert_to_bytes_ctx(&self.#ident, slice, cursor, flags);
+                            #with_attr::convert_to_bytes(&self.#ident, slice, cursor);
                         });
                         from_slice_ctx.push(quote! {
-                            let #ident: #typ = #with_attr::from_slice_ctx(slice, flags)?;
+                            let #ident: #typ = #with_attr::from_slice(slice)?;
                         });
                         size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
                             Some(s) => s,
-                            None => #with_attr::size_ctx(&self.#ident, flags)
+                            None => #with_attr::size(&self.#ident)
                         }) });
                     }
                     None => {
@@ -511,14 +511,14 @@ pub fn struct_serializer(
                             #with_attr::convert_to_bytes(&self.#id, slice, cursor);
                         });
                         convert_to_bytes_ctx.push(quote! {
-                            #with_attr::convert_to_bytes_ctx(&self.#id, slice, cursor, flags);
+                            #with_attr::convert_to_bytes(&self.#id, slice, cursor);
                         });
                         from_slice_ctx.push(quote! {
-                            let #field_name: #typ = #with_attr::from_slice_ctx(slice, flags)?;
+                            let #field_name: #typ = #with_attr::from_slice(slice)?;
                         });
                         size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
                             Some(s) => s,
-                            None => #with_attr::size_ctx(&self.#id, flags)
+                            None => #with_attr::size(&self.#id)
                         }) });
                     }
                     None => {
