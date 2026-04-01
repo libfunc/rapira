@@ -24,6 +24,9 @@ pub fn enum_with_primitive_serializer(
     let mut size: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut enum_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut min_sizes: Vec<TokenStream> = Vec::with_capacity(variants_len);
+    let mut convert_to_bytes_ctx: Vec<TokenStream> = Vec::with_capacity(variants_len);
+    let mut from_slice_ctx: Vec<TokenStream> = Vec::with_capacity(variants_len);
+    let mut size_ctx: Vec<TokenStream> = Vec::with_capacity(variants_len);
 
     for variant in &data_enum.variants {
         let variant_name = &variant.ident;
@@ -69,6 +72,18 @@ pub fn enum_with_primitive_serializer(
 
                 min_sizes.push(quote! {
                     0usize,
+                });
+
+                convert_to_bytes_ctx.push(quote! {
+                    #name::#variant_name => {}
+                });
+                from_slice_ctx.push(quote! {
+                    #primitive_name::#variant_name => {
+                        Ok(#name::#variant_name)
+                    }
+                });
+                size_ctx.push(quote! {
+                    #name::#variant_name => 0,
                 });
             }
             Fields::Unnamed(fields) => {
@@ -132,6 +147,26 @@ pub fn enum_with_primitive_serializer(
                     min_sizes.push(quote! {
                         <#typ>::MIN_SIZE,
                     });
+
+                    convert_to_bytes_ctx.push(quote! {
+                        #name::#variant_name(v) => {
+                            v.convert_to_bytes_ctx(slice, cursor, flags);
+                        }
+                    });
+                    from_slice_ctx.push(quote! {
+                        #primitive_name::#variant_name => {
+                            let v = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                            Ok(#name::#variant_name(v))
+                        }
+                    });
+                    size_ctx.push(quote! {
+                        #name::#variant_name(v) => {
+                            match <#typ>::STATIC_SIZE {
+                                Some(s) => s,
+                                None => v.size_ctx(flags),
+                            }
+                        },
+                    });
                 } else {
                     let unnamed = &fields.unnamed;
 
@@ -147,6 +182,10 @@ pub fn enum_with_primitive_serializer(
                     let mut unnamed_size: Vec<TokenStream> = Vec::with_capacity(len);
                     let mut unnamed_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
                     let mut unnamed_min_sizes: Vec<TokenStream> = Vec::with_capacity(len);
+                    let mut unnamed_convert_to_bytes_ctx: Vec<TokenStream> =
+                        Vec::with_capacity(len);
+                    let mut unnamed_from_slice_ctx: Vec<TokenStream> = Vec::with_capacity(len);
+                    let mut unnamed_size_ctx: Vec<TokenStream> = Vec::with_capacity(len);
 
                     for (idx, field) in unnamed.iter().enumerate() {
                         let typ = &field.ty;
@@ -180,6 +219,16 @@ pub fn enum_with_primitive_serializer(
                         unnamed_min_sizes.push(quote! {
                             <#typ>::MIN_SIZE,
                         });
+                        unnamed_convert_to_bytes_ctx.push(quote! {
+                            #field_name.convert_to_bytes_ctx(slice, cursor, flags);
+                        });
+                        unnamed_from_slice_ctx.push(quote! {
+                            let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                        });
+                        unnamed_size_ctx.push(quote! { + (match <#typ>::STATIC_SIZE {
+                            Some(s) => s,
+                            None => #field_name.size_ctx(flags)
+                        }) });
                         field_names.push(quote! { #field_name, });
                     }
 
@@ -235,6 +284,23 @@ pub fn enum_with_primitive_serializer(
                     min_sizes.push(quote! {
                         rapira::min_size(&[#(#unnamed_min_sizes)*]),
                     });
+
+                    convert_to_bytes_ctx.push(quote! {
+                        #name::#variant_name(#(#field_names)*) => {
+                            #(#unnamed_convert_to_bytes_ctx)*
+                        }
+                    });
+                    from_slice_ctx.push(quote! {
+                        #primitive_name::#variant_name => {
+                            #(#unnamed_from_slice_ctx)*
+                            Ok(#name::#variant_name(#(#field_names)*))
+                        }
+                    });
+                    size_ctx.push(quote! {
+                        #name::#variant_name(#(#field_names)*) => {
+                            0 #(#unnamed_size_ctx)*
+                        },
+                    });
                 }
             }
             Fields::Named(fields) => {
@@ -267,6 +333,9 @@ pub fn enum_with_primitive_serializer(
                 let mut named_size: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut named_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut named_min_sizes: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut named_convert_to_bytes_ctx: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut named_from_slice_ctx: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut named_size_ctx: Vec<TokenStream> = Vec::with_capacity(len);
 
                 for field in fields_insert.iter().map(|(f, _)| f) {
                     let typ = &field.ty;
@@ -300,6 +369,16 @@ pub fn enum_with_primitive_serializer(
                     named_min_sizes.push(quote! {
                         <#typ>::MIN_SIZE,
                     });
+                    named_convert_to_bytes_ctx.push(quote! {
+                        #field_name.convert_to_bytes_ctx(slice, cursor, flags);
+                    });
+                    named_from_slice_ctx.push(quote! {
+                        let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                    });
+                    named_size_ctx.push(quote! { + (match <#typ>::STATIC_SIZE {
+                        Some(s) => s,
+                        None => #field_name.size_ctx(flags)
+                    }) });
                     field_names.push(quote! { #field_name, });
                 }
 
@@ -354,6 +433,23 @@ pub fn enum_with_primitive_serializer(
 
                 min_sizes.push(quote! {
                     rapira::min_size(&[#(#named_min_sizes)*]),
+                });
+
+                convert_to_bytes_ctx.push(quote! {
+                    #name::#variant_name{#(#field_names)*} => {
+                        #(#named_convert_to_bytes_ctx)*
+                    }
+                });
+                from_slice_ctx.push(quote! {
+                    #primitive_name::#variant_name => {
+                        #(#named_from_slice_ctx)*
+                        Ok(#name::#variant_name{#(#field_names)*})
+                    }
+                });
+                size_ctx.push(quote! {
+                    #name::#variant_name{#(#field_names)*} => {
+                        0 #(#named_size_ctx)*
+                    },
                 });
             }
         };
@@ -437,6 +533,34 @@ pub fn enum_with_primitive_serializer(
             fn size(&self) -> usize {
                 1 + match self {
                     #(#size)*
+                }
+            }
+
+            #[inline]
+            fn convert_to_bytes_ctx(&self, slice: &mut [u8], cursor: &mut usize, flags: rapira::RapiraFlags) {
+                let t = #primitive_name::from(self) as u8;
+                rapira::push(slice, cursor, t);
+                match self {
+                    #(#convert_to_bytes_ctx)*
+                }
+            }
+
+            #[inline]
+            fn from_slice_ctx(slice: &mut &[u8], flags: rapira::RapiraFlags) -> rapira::Result<Self>
+            where
+                Self: Sized,
+            {
+                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                let t = <#primitive_name as TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)?;
+                match t {
+                    #(#from_slice_ctx)*
+                }
+            }
+
+            #[inline]
+            fn size_ctx(&self, flags: rapira::RapiraFlags) -> usize {
+                1 + match self {
+                    #(#size_ctx)*
                 }
             }
         }
