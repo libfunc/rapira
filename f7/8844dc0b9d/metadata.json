@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "f78844dc0b9d",
+  "strategy": "manual-commit",
+  "branch": "feat/rapira-ctx-flags",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "rapira-derive/src/structs.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f7/8844dc0b9d/0/metadata.json",
+      "transcript": "/f7/8844dc0b9d/0/full.jsonl",
+      "content_hash": "/f7/8844dc0b9d/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 27,
+    "cache_creation_tokens": 15901,
+    "cache_read_tokens": 4439672,
+    "output_tokens": 7416,
+    "api_call_count": 27
+  }
+}
