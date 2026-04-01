@@ -31,6 +31,9 @@ pub fn enum_serializer(
     let mut from_slice_unsafe: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut try_convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
     let mut convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(variants_len);
+    let mut convert_to_bytes_ctx: Vec<TokenStream> = Vec::with_capacity(variants_len);
+    let mut from_slice_ctx: Vec<TokenStream> = Vec::with_capacity(variants_len);
+    let mut size_ctx: Vec<TokenStream> = Vec::with_capacity(variants_len);
 
     let variants_iter = data_enum.variants.iter().enumerate().map(|(idx, variant)| {
         let id: u8 = extract_idx_attr(&variant.attrs)
@@ -88,6 +91,19 @@ pub fn enum_serializer(
                         Ok(#name::#variant_name)
                     }
                 });
+                convert_to_bytes_ctx.push(quote! {
+                    #name::#variant_name => {
+                        rapira::push(slice, cursor, #variant_id);
+                    }
+                });
+                from_slice_ctx.push(quote! {
+                    #variant_id => {
+                        Ok(#name::#variant_name)
+                    }
+                });
+                size_ctx.push(quote! {
+                    #name::#variant_name => 0,
+                });
             }
             Fields::Unnamed(fields) => {
                 let len = fields.unnamed.len();
@@ -104,6 +120,9 @@ pub fn enum_serializer(
                 let mut fields_from_slice_unsafe: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_try_convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_convert_to_bytes: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_convert_to_bytes_ctx: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_from_slice_ctx: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_size_ctx: Vec<TokenStream> = Vec::with_capacity(len);
 
                 for (idx, field) in fields.iter().enumerate() {
                     let typ = &field.ty;
@@ -154,6 +173,16 @@ pub fn enum_serializer(
                             fields_convert_to_bytes.push(quote! {
                                 #with_attr::convert_to_bytes(#field_name, slice, cursor);
                             });
+                            fields_convert_to_bytes_ctx.push(quote! {
+                                #with_attr::convert_to_bytes_ctx(#field_name, slice, cursor, flags);
+                            });
+                            fields_from_slice_ctx.push(quote! {
+                                let #field_name: #typ = #with_attr::from_slice_ctx(slice, flags)?;
+                            });
+                            fields_size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
+                                Some(s) => s,
+                                None => #with_attr::size_ctx(#field_name, flags)
+                            }) });
                         }
                         None => {
                             fields_static_sizes.push(quote! {
@@ -196,6 +225,18 @@ pub fn enum_serializer(
                             fields_convert_to_bytes.push(quote! {
                                 #field_name.convert_to_bytes(slice, cursor);
                             });
+                            fields_convert_to_bytes_ctx.push(quote! {
+                                #field_name.convert_to_bytes_ctx(slice, cursor, flags);
+                            });
+                            fields_from_slice_ctx.push(quote! {
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                            });
+                            fields_size_ctx.push(
+                                quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
+                                    Some(s) => s,
+                                    None => #field_name.size_ctx(flags)
+                                }) },
+                            );
                         }
                     }
                 }
@@ -256,6 +297,24 @@ pub fn enum_serializer(
                         #(#fields_convert_to_bytes)*
                     }
                 });
+
+                convert_to_bytes_ctx.push(quote! {
+                    #name::#variant_name(#(#field_names)*) => {
+                        rapira::push(slice, cursor, #variant_id);
+                        #(#fields_convert_to_bytes_ctx)*
+                    }
+                });
+                from_slice_ctx.push(quote! {
+                    #variant_id => {
+                        #(#fields_from_slice_ctx)*
+                        Ok(#name::#variant_name(#(#field_names)*))
+                    }
+                });
+                size_ctx.push(quote! {
+                    #name::#variant_name(#(#field_names)*) => {
+                        0 #(#fields_size_ctx)*
+                    },
+                });
             }
             Fields::Named(fields) => {
                 let len = fields.named.len();
@@ -288,6 +347,9 @@ pub fn enum_serializer(
                 let mut fields_static_sizes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_min_sizes: Vec<TokenStream> = Vec::with_capacity(len);
                 let mut fields_debug_from_slice: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_convert_to_bytes_ctx: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_from_slice_ctx: Vec<TokenStream> = Vec::with_capacity(len);
+                let mut fields_size_ctx: Vec<TokenStream> = Vec::with_capacity(len);
 
                 for field in fields_insert.iter().map(|(f, _)| f) {
                     let typ = &field.ty;
@@ -338,6 +400,16 @@ pub fn enum_serializer(
                             fields_convert_to_bytes.push(quote! {
                                 #with_attr::convert_to_bytes(#field_name, slice, cursor);
                             });
+                            fields_convert_to_bytes_ctx.push(quote! {
+                                #with_attr::convert_to_bytes_ctx(#field_name, slice, cursor, flags);
+                            });
+                            fields_from_slice_ctx.push(quote! {
+                                let #field_name: #typ = #with_attr::from_slice_ctx(slice, flags)?;
+                            });
+                            fields_size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
+                                Some(s) => s,
+                                None => #with_attr::size_ctx(#field_name, flags)
+                            }) });
                         }
                         None => {
                             fields_from_slice.push(quote! {
@@ -380,6 +452,18 @@ pub fn enum_serializer(
                             fields_min_sizes.push(quote! {
                                 <#typ as rapira::Rapira>::MIN_SIZE,
                             });
+                            fields_convert_to_bytes_ctx.push(quote! {
+                                #field_name.convert_to_bytes_ctx(slice, cursor, flags);
+                            });
+                            fields_from_slice_ctx.push(quote! {
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                            });
+                            fields_size_ctx.push(
+                                quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
+                                    Some(s) => s,
+                                    None => #field_name.size_ctx(flags)
+                                }) },
+                            );
                         }
                     }
                 }
@@ -439,6 +523,24 @@ pub fn enum_serializer(
                         rapira::push(slice, cursor, #variant_id);
                         #(#fields_convert_to_bytes)*
                     }
+                });
+
+                convert_to_bytes_ctx.push(quote! {
+                    #name::#variant_name{#(#field_names)*} => {
+                        rapira::push(slice, cursor, #variant_id);
+                        #(#fields_convert_to_bytes_ctx)*
+                    }
+                });
+                from_slice_ctx.push(quote! {
+                    #variant_id => {
+                        #(#fields_from_slice_ctx)*
+                        Ok(#name::#variant_name{#(#field_names)*})
+                    }
+                });
+                size_ctx.push(quote! {
+                    #name::#variant_name{#(#field_names)*} => {
+                        0 #(#fields_size_ctx)*
+                    },
                 });
             }
         }
@@ -567,6 +669,32 @@ pub fn enum_serializer(
             fn size(&self) -> usize {
                 1 + match self {
                     #(#size)*
+                }
+            }
+
+            #[inline]
+            fn convert_to_bytes_ctx(&self, slice: &mut [u8], cursor: &mut usize, flags: rapira::RapiraFlags) {
+                match self {
+                    #(#convert_to_bytes_ctx)*
+                }
+            }
+
+            #[inline]
+            fn from_slice_ctx(slice: &mut &[u8], flags: rapira::RapiraFlags) -> rapira::Result<Self>
+            where
+                Self: Sized,
+            {
+                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                match val {
+                    #(#from_slice_ctx)*
+                    _ => Err(rapira::RapiraError::EnumVariant),
+                }
+            }
+
+            #[inline]
+            fn size_ctx(&self, flags: rapira::RapiraFlags) -> usize {
+                1 + match self {
+                    #(#size_ctx)*
                 }
             }
         }
