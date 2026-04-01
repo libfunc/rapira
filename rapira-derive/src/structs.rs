@@ -91,6 +91,9 @@ pub fn struct_serializer(
             let mut size: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut static_sizes: Vec<TokenStream> = Vec::with_capacity(named_len);
             let mut min_size: Vec<TokenStream> = Vec::with_capacity(named_len);
+            let mut convert_to_bytes_ctx: Vec<TokenStream> = Vec::with_capacity(named_len);
+            let mut from_slice_ctx: Vec<TokenStream> = Vec::with_capacity(named_len);
+            let mut size_ctx: Vec<TokenStream> = Vec::with_capacity(named_len);
 
             for (field, _, with_attr, since) in fields_insert.iter() {
                 let ident = field.ident.as_ref().unwrap();
@@ -179,6 +182,16 @@ pub fn struct_serializer(
                         convert_to_bytes.push(quote! {
                             #with_attr::convert_to_bytes(&self.#ident, slice, cursor);
                         });
+                        convert_to_bytes_ctx.push(quote! {
+                            #with_attr::convert_to_bytes_ctx(&self.#ident, slice, cursor, flags);
+                        });
+                        from_slice_ctx.push(quote! {
+                            let #ident: #typ = #with_attr::from_slice_ctx(slice, flags)?;
+                        });
+                        size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
+                            Some(s) => s,
+                            None => #with_attr::size_ctx(&self.#ident, flags)
+                        }) });
                     }
                     None => {
                         from_slice.push(quote! {
@@ -219,6 +232,16 @@ pub fn struct_serializer(
                         min_size.push(quote! {
                             <#typ as rapira::Rapira>::MIN_SIZE,
                         });
+                        convert_to_bytes_ctx.push(quote! {
+                            self.#ident.convert_to_bytes_ctx(slice, cursor, flags);
+                        });
+                        from_slice_ctx.push(quote! {
+                            let #ident = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                        });
+                        size_ctx.push(quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
+                            Some(s) => s,
+                            None => self.#ident.size_ctx(flags)
+                        }) });
                     }
                 }
             }
@@ -330,6 +353,27 @@ pub fn struct_serializer(
                     fn size(&self) -> usize {
                         0 #(#size)*
                     }
+
+                    #[inline]
+                    fn convert_to_bytes_ctx(&self, slice: &mut [u8], cursor: &mut usize, flags: rapira::RapiraFlags) {
+                        #(#convert_to_bytes_ctx)*
+                    }
+
+                    #[inline]
+                    fn from_slice_ctx(slice: &mut &[u8], flags: rapira::RapiraFlags) -> rapira::Result<Self>
+                    where
+                        Self: Sized,
+                    {
+                        #(#from_slice_ctx)*
+                        Ok(#name {
+                            #(#field_names)*
+                        })
+                    }
+
+                    #[inline]
+                    fn size_ctx(&self, flags: rapira::RapiraFlags) -> usize {
+                        0 #(#size_ctx)*
+                    }
                 }
             };
             proc_macro::TokenStream::from(res)
@@ -349,6 +393,9 @@ pub fn struct_serializer(
             let mut size: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut static_sizes: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
             let mut min_size: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
+            let mut convert_to_bytes_ctx: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
+            let mut from_slice_ctx: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
+            let mut size_ctx: Vec<TokenStream> = Vec::with_capacity(unnamed_len);
 
             for (idx, field) in unnamed.iter().enumerate() {
                 let id = syn::Lit::Int(LitInt::new(&idx.to_string(), Span::call_site()));
@@ -463,6 +510,16 @@ pub fn struct_serializer(
                         convert_to_bytes.push(quote! {
                             #with_attr::convert_to_bytes(&self.#id, slice, cursor);
                         });
+                        convert_to_bytes_ctx.push(quote! {
+                            #with_attr::convert_to_bytes_ctx(&self.#id, slice, cursor, flags);
+                        });
+                        from_slice_ctx.push(quote! {
+                            let #field_name: #typ = #with_attr::from_slice_ctx(slice, flags)?;
+                        });
+                        size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
+                            Some(s) => s,
+                            None => #with_attr::size_ctx(&self.#id, flags)
+                        }) });
                     }
                     None => {
                         from_slice.push(quote! {
@@ -503,6 +560,16 @@ pub fn struct_serializer(
                         min_size.push(quote! {
                             <#typ as rapira::Rapira>::MIN_SIZE,
                         });
+                        convert_to_bytes_ctx.push(quote! {
+                            self.#id.convert_to_bytes_ctx(slice, cursor, flags);
+                        });
+                        from_slice_ctx.push(quote! {
+                            let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                        });
+                        size_ctx.push(quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
+                            Some(s) => s,
+                            None => self.#id.size_ctx(flags)
+                        }) });
                     }
                 }
             }
@@ -601,6 +668,25 @@ pub fn struct_serializer(
 
                     #[inline]
                     fn size(&self) -> usize { 0 #(#size)* }
+
+                    #[inline]
+                    fn convert_to_bytes_ctx(&self, slice: &mut [u8], cursor: &mut usize, flags: rapira::RapiraFlags) {
+                        #(#convert_to_bytes_ctx)*
+                    }
+
+                    #[inline]
+                    fn from_slice_ctx(slice: &mut &[u8], flags: rapira::RapiraFlags) -> rapira::Result<Self>
+                    where
+                        Self: Sized,
+                    {
+                        #(#from_slice_ctx)*
+                        Ok(#name(#(#field_names)*))
+                    }
+
+                    #[inline]
+                    fn size_ctx(&self, flags: rapira::RapiraFlags) -> usize {
+                        0 #(#size_ctx)*
+                    }
                 }
             };
 
