@@ -68,12 +68,12 @@ pub fn enum_serializer(
                 });
                 try_convert_to_bytes.push(quote! {
                     #name::#variant_name => {
-                        rapira::push(slice, cursor, #variant_id);
+                        rapira::push(__rapira_slice, __rapira_cursor, #variant_id);
                     }
                 });
                 convert_to_bytes.push(quote! {
                     #name::#variant_name => {
-                        rapira::push(slice, cursor, #variant_id);
+                        rapira::push(__rapira_slice, __rapira_cursor, #variant_id);
                     }
                 });
                 size.push(quote! {
@@ -93,7 +93,7 @@ pub fn enum_serializer(
                 });
                 convert_to_bytes_ctx.push(quote! {
                     #name::#variant_name => {
-                        rapira::push(slice, cursor, #variant_id);
+                        rapira::push(__rapira_slice, __rapira_cursor, #variant_id);
                     }
                 });
                 from_slice_ctx.push(quote! {
@@ -146,15 +146,15 @@ pub fn enum_serializer(
                                 }) },
                             );
                             fields_check_bytes.push(quote! {
-                                #with_attr::check_bytes(core::marker::PhantomData::<#typ>, slice)?;
+                                #with_attr::check_bytes(core::marker::PhantomData::<#typ>, __rapira_slice)?;
                             });
                             fields_from_slice.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice(slice)?;
+                                let #field_name: #typ = #with_attr::from_slice(__rapira_slice)?;
                             });
                             fields_debug_from_slice.push(quote! {
-                                let len = slice.len();
+                                let len = __rapira_slice.len();
                                 println!("Field: unnamed (index {}), Type: {}", #idx, stringify!(#typ));
-                                let res = #with_attr::from_slice(slice).inspect(|v| {
+                                let res = #with_attr::from_slice(__rapira_slice).inspect(|v| {
                                     println!("len: {len}, unnamed (index {}): {v:?}", #idx);
                                 }).inspect_err(|err| {
                                     println!("len: {len}, err: {err:?}");
@@ -162,22 +162,22 @@ pub fn enum_serializer(
                                 let #field_name: #typ = res?;
                             });
                             fields_from_slice_unchecked.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice_unchecked(slice)?;
+                                let #field_name: #typ = #with_attr::from_slice_unchecked(__rapira_slice)?;
                             });
                             fields_from_slice_unsafe.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice_unsafe(slice)?;
+                                let #field_name: #typ = #with_attr::from_slice_unsafe(__rapira_slice)?;
                             });
                             fields_try_convert_to_bytes.push(quote! {
-                                #with_attr::try_convert_to_bytes(#field_name, slice, cursor)?;
+                                #with_attr::try_convert_to_bytes(#field_name, __rapira_slice, __rapira_cursor)?;
                             });
                             fields_convert_to_bytes.push(quote! {
-                                #with_attr::convert_to_bytes(#field_name, slice, cursor);
+                                #with_attr::convert_to_bytes(#field_name, __rapira_slice, __rapira_cursor);
                             });
                             fields_convert_to_bytes_ctx.push(quote! {
-                                #with_attr::convert_to_bytes(#field_name, slice, cursor);
+                                #with_attr::convert_to_bytes(#field_name, __rapira_slice, __rapira_cursor);
                             });
                             fields_from_slice_ctx.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice(slice)?;
+                                let #field_name: #typ = #with_attr::from_slice(__rapira_slice)?;
                             });
                             fields_size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
                                 Some(s) => s,
@@ -198,12 +198,12 @@ pub fn enum_serializer(
                                 }) },
                             );
                             fields_from_slice.push(quote! {
-                                let #field_name = <#typ as rapira::Rapira>::from_slice(slice)?;
+                                let #field_name = <#typ as rapira::Rapira>::from_slice(__rapira_slice)?;
                             });
                             fields_debug_from_slice.push(quote! {
-                                let len = slice.len();
+                                let len = __rapira_slice.len();
                                 println!("Field: unnamed (index {}), Type: {}", #idx, stringify!(#typ));
-                                let res = <#typ as rapira::Rapira>::from_slice(slice).inspect(|v| {
+                                let res = <#typ as rapira::Rapira>::from_slice(__rapira_slice).inspect(|v| {
                                     println!("len: {len}, unnamed: {v:?}");
                                 }).inspect_err(|err| {
                                     println!("len: {len}, err: {err:?}");
@@ -211,30 +211,30 @@ pub fn enum_serializer(
                                 let #field_name: #typ = res?;
                             });
                             fields_check_bytes.push(quote! {
-                                <#typ as rapira::Rapira>::check_bytes(slice)?;
+                                <#typ as rapira::Rapira>::check_bytes(__rapira_slice)?;
                             });
                             fields_from_slice_unchecked.push(quote! {
-                                let #field_name = <#typ as rapira::Rapira>::from_slice_unchecked(slice)?;
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_unchecked(__rapira_slice)?;
                             });
                             fields_from_slice_unsafe.push(quote! {
-                                let #field_name = <#typ as rapira::Rapira>::from_slice_unsafe(slice)?;
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_unsafe(__rapira_slice)?;
                             });
                             fields_try_convert_to_bytes.push(quote! {
-                                #field_name.try_convert_to_bytes(slice, cursor)?;
+                                #field_name.try_convert_to_bytes(__rapira_slice, __rapira_cursor)?;
                             });
                             fields_convert_to_bytes.push(quote! {
-                                #field_name.convert_to_bytes(slice, cursor);
+                                #field_name.convert_to_bytes(__rapira_slice, __rapira_cursor);
                             });
                             fields_convert_to_bytes_ctx.push(quote! {
-                                #field_name.convert_to_bytes_ctx(slice, cursor, flags);
+                                #field_name.convert_to_bytes_ctx(__rapira_slice, __rapira_cursor, __rapira_flags);
                             });
                             fields_from_slice_ctx.push(quote! {
-                                let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(__rapira_slice, __rapira_flags)?;
                             });
                             fields_size_ctx.push(
                                 quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
                                     Some(s) => s,
-                                    None => #field_name.size_ctx(flags)
+                                    None => #field_name.size_ctx(__rapira_flags)
                                 }) },
                             );
                         }
@@ -286,21 +286,21 @@ pub fn enum_serializer(
 
                 try_convert_to_bytes.push(quote! {
                     #name::#variant_name(#(#field_names)*) => {
-                        rapira::push(slice, cursor, #variant_id);
+                        rapira::push(__rapira_slice, __rapira_cursor, #variant_id);
                         #(#fields_try_convert_to_bytes)*
                     }
                 });
 
                 convert_to_bytes.push(quote! {
                     #name::#variant_name(#(#field_names)*) => {
-                        rapira::push(slice, cursor, #variant_id);
+                        rapira::push(__rapira_slice, __rapira_cursor, #variant_id);
                         #(#fields_convert_to_bytes)*
                     }
                 });
 
                 convert_to_bytes_ctx.push(quote! {
                     #name::#variant_name(#(#field_names)*) => {
-                        rapira::push(slice, cursor, #variant_id);
+                        rapira::push(__rapira_slice, __rapira_cursor, #variant_id);
                         #(#fields_convert_to_bytes_ctx)*
                     }
                 });
@@ -373,15 +373,15 @@ pub fn enum_serializer(
                                 }) },
                             );
                             fields_check_bytes.push(quote! {
-                                #with_attr::check_bytes(core::marker::PhantomData::<#typ>, slice)?;
+                                #with_attr::check_bytes(core::marker::PhantomData::<#typ>, __rapira_slice)?;
                             });
                             fields_from_slice.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice(slice)?;
+                                let #field_name: #typ = #with_attr::from_slice(__rapira_slice)?;
                             });
                             fields_debug_from_slice.push(quote! {
-                                let len = slice.len();
+                                let len = __rapira_slice.len();
                                 println!("Field: {}, Type: {}", stringify!(#field_name), stringify!(#typ));
-                                let res = #with_attr::from_slice(slice).inspect(|v| {
+                                let res = #with_attr::from_slice(__rapira_slice).inspect(|v| {
                                     println!("len: {len}, {}: {v:?}", stringify!(#field_name));
                                 }).inspect_err(|err| {
                                     println!("len: {len}, err: {err:?}");
@@ -389,22 +389,22 @@ pub fn enum_serializer(
                                 let #field_name: #typ = res?;
                             });
                             fields_from_slice_unchecked.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice_unchecked(slice)?;
+                                let #field_name: #typ = #with_attr::from_slice_unchecked(__rapira_slice)?;
                             });
                             fields_from_slice_unsafe.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice_unsafe(slice)?;
+                                let #field_name: #typ = #with_attr::from_slice_unsafe(__rapira_slice)?;
                             });
                             fields_try_convert_to_bytes.push(quote! {
-                                #with_attr::try_convert_to_bytes(#field_name, slice, cursor)?;
+                                #with_attr::try_convert_to_bytes(#field_name, __rapira_slice, __rapira_cursor)?;
                             });
                             fields_convert_to_bytes.push(quote! {
-                                #with_attr::convert_to_bytes(#field_name, slice, cursor);
+                                #with_attr::convert_to_bytes(#field_name, __rapira_slice, __rapira_cursor);
                             });
                             fields_convert_to_bytes_ctx.push(quote! {
-                                #with_attr::convert_to_bytes(#field_name, slice, cursor);
+                                #with_attr::convert_to_bytes(#field_name, __rapira_slice, __rapira_cursor);
                             });
                             fields_from_slice_ctx.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice(slice)?;
+                                let #field_name: #typ = #with_attr::from_slice(__rapira_slice)?;
                             });
                             fields_size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
                                 Some(s) => s,
@@ -413,12 +413,12 @@ pub fn enum_serializer(
                         }
                         None => {
                             fields_from_slice.push(quote! {
-                                let #field_name = <#typ as rapira::Rapira>::from_slice(slice)?;
+                                let #field_name = <#typ as rapira::Rapira>::from_slice(__rapira_slice)?;
                             });
                             fields_debug_from_slice.push(quote! {
-                                let len = slice.len();
+                                let len = __rapira_slice.len();
                                 println!("Field: {}, Type: {}", stringify!(#field_name), stringify!(#typ));
-                                let res = <#typ as rapira::Rapira>::from_slice(slice).inspect(|v| {
+                                let res = <#typ as rapira::Rapira>::from_slice(__rapira_slice).inspect(|v| {
                                     println!("len: {len}, {}: {v:?}", stringify!(#field_name));
                                 }).inspect_err(|err| {
                                     println!("len: {len}, err: {err:?}");
@@ -426,19 +426,19 @@ pub fn enum_serializer(
                                 let #field_name = res?;
                             });
                             fields_check_bytes.push(quote! {
-                                <#typ as rapira::Rapira>::check_bytes(slice)?;
+                                <#typ as rapira::Rapira>::check_bytes(__rapira_slice)?;
                             });
                             fields_from_slice_unchecked.push(quote! {
-                                let #field_name = <#typ as rapira::Rapira>::from_slice_unchecked(slice)?;
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_unchecked(__rapira_slice)?;
                             });
                             fields_from_slice_unsafe.push(quote! {
-                                let #field_name = <#typ as rapira::Rapira>::from_slice_unsafe(slice)?;
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_unsafe(__rapira_slice)?;
                             });
                             fields_try_convert_to_bytes.push(quote! {
-                                #field_name.try_convert_to_bytes(slice, cursor)?;
+                                #field_name.try_convert_to_bytes(__rapira_slice, __rapira_cursor)?;
                             });
                             fields_convert_to_bytes.push(quote! {
-                                #field_name.convert_to_bytes(slice, cursor);
+                                #field_name.convert_to_bytes(__rapira_slice, __rapira_cursor);
                             });
                             fields_size.push(
                                 quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
@@ -453,15 +453,15 @@ pub fn enum_serializer(
                                 <#typ as rapira::Rapira>::MIN_SIZE,
                             });
                             fields_convert_to_bytes_ctx.push(quote! {
-                                #field_name.convert_to_bytes_ctx(slice, cursor, flags);
+                                #field_name.convert_to_bytes_ctx(__rapira_slice, __rapira_cursor, __rapira_flags);
                             });
                             fields_from_slice_ctx.push(quote! {
-                                let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(__rapira_slice, __rapira_flags)?;
                             });
                             fields_size_ctx.push(
                                 quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
                                     Some(s) => s,
-                                    None => #field_name.size_ctx(flags)
+                                    None => #field_name.size_ctx(__rapira_flags)
                                 }) },
                             );
                         }
@@ -513,21 +513,21 @@ pub fn enum_serializer(
 
                 try_convert_to_bytes.push(quote! {
                     #name::#variant_name{#(#field_names)*} => {
-                        rapira::push(slice, cursor, #variant_id);
+                        rapira::push(__rapira_slice, __rapira_cursor, #variant_id);
                         #(#fields_try_convert_to_bytes)*
                     }
                 });
 
                 convert_to_bytes.push(quote! {
                     #name::#variant_name{#(#field_names)*} => {
-                        rapira::push(slice, cursor, #variant_id);
+                        rapira::push(__rapira_slice, __rapira_cursor, #variant_id);
                         #(#fields_convert_to_bytes)*
                     }
                 });
 
                 convert_to_bytes_ctx.push(quote! {
                     #name::#variant_name{#(#field_names)*} => {
-                        rapira::push(slice, cursor, #variant_id);
+                        rapira::push(__rapira_slice, __rapira_cursor, #variant_id);
                         #(#fields_convert_to_bytes_ctx)*
                     }
                 });
@@ -575,15 +575,15 @@ pub fn enum_serializer(
 
     let debug_parse = if is_debug {
         quote! {
-            /// Deserializes a value from a byte slice with debug logging.
+            /// Deserializes a value from a byte __rapira_slice with debug logging.
             /// This method logs the enum variant name, field names, types, and values during deserialization.
             /// Useful for debugging serialization/deserialization issues.
             #[inline]
-            fn debug_from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+            fn debug_from_slice(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
             where
                 Self: Sized + std::fmt::Debug,
             {
-                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice(__rapira_slice)?;
                 match val {
                     #(#debug_from_slice)*
                     _ => Err(rapira::RapiraError::EnumVariant),
@@ -600,11 +600,11 @@ pub fn enum_serializer(
             const MIN_SIZE: usize = #min_size;
 
             #[inline]
-            fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+            fn from_slice(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
             where
                 Self: Sized,
             {
-                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice(__rapira_slice)?;
                 match val {
                     #(#from_slice)*
                     _ => Err(rapira::RapiraError::EnumVariant),
@@ -614,11 +614,11 @@ pub fn enum_serializer(
             #debug_parse
 
             #[inline]
-            fn check_bytes(slice: &mut &[u8]) -> rapira::Result<()>
+            fn check_bytes(__rapira_slice: &mut &[u8]) -> rapira::Result<()>
             where
                 Self: Sized,
             {
-                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice(__rapira_slice)?;
                 match val {
                     #(#check_bytes)*
                     _ => return Err(rapira::RapiraError::EnumVariant),
@@ -627,11 +627,11 @@ pub fn enum_serializer(
             }
 
             #[inline]
-            unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> rapira::Result<Self>
+            unsafe fn from_slice_unchecked(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
             where
                 Self: Sized,
             {
-                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice(__rapira_slice)?;
                 match val {
                     #(#from_slice_unchecked)*
                     _ => Err(rapira::RapiraError::EnumVariant),
@@ -639,11 +639,11 @@ pub fn enum_serializer(
             }
 
             #[inline]
-            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> rapira::Result<Self>
+            unsafe fn from_slice_unsafe(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
             where
                 Self: Sized,
             {
-                let val: u8 = rapira::byte_rapira::from_slice_unsafe(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice_unsafe(__rapira_slice)?;
                 match val {
                     #(#from_slice_unsafe)*
                     _ => Err(rapira::RapiraError::EnumVariant),
@@ -651,7 +651,7 @@ pub fn enum_serializer(
             }
 
             #[inline]
-            fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> rapira::Result<()> {
+            fn try_convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) -> rapira::Result<()> {
                 match self {
                     #(#try_convert_to_bytes)*
                 }
@@ -659,7 +659,7 @@ pub fn enum_serializer(
             }
 
             #[inline]
-            fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+            fn convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) {
                 match self {
                     #(#convert_to_bytes)*
                 }
@@ -673,18 +673,18 @@ pub fn enum_serializer(
             }
 
             #[inline]
-            fn convert_to_bytes_ctx(&self, slice: &mut [u8], cursor: &mut usize, flags: rapira::RapiraFlags) {
+            fn convert_to_bytes_ctx(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize, __rapira_flags: rapira::RapiraFlags) {
                 match self {
                     #(#convert_to_bytes_ctx)*
                 }
             }
 
             #[inline]
-            fn from_slice_ctx(slice: &mut &[u8], flags: rapira::RapiraFlags) -> rapira::Result<Self>
+            fn from_slice_ctx(__rapira_slice: &mut &[u8], __rapira_flags: rapira::RapiraFlags) -> rapira::Result<Self>
             where
                 Self: Sized,
             {
-                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice(__rapira_slice)?;
                 match val {
                     #(#from_slice_ctx)*
                     _ => Err(rapira::RapiraError::EnumVariant),
@@ -692,7 +692,7 @@ pub fn enum_serializer(
             }
 
             #[inline]
-            fn size_ctx(&self, flags: rapira::RapiraFlags) -> usize {
+            fn size_ctx(&self, __rapira_flags: rapira::RapiraFlags) -> usize {
                 1 + match self {
                     #(#size_ctx)*
                 }

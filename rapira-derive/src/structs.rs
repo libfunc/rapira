@@ -107,8 +107,8 @@ pub fn struct_serializer(
                     match with_attr {
                         Some(with_attr) => {
                             from_slice_versioned.push(quote! {
-                                let #ident: #typ = if version >= #since_val {
-                                    #with_attr::from_slice(slice)?
+                                let #ident: #typ = if __rapira_version >= #since_val {
+                                    #with_attr::from_slice(__rapira_slice)?
                                 } else {
                                     Default::default()
                                 };
@@ -116,8 +116,8 @@ pub fn struct_serializer(
                         }
                         None => {
                             from_slice_versioned.push(quote! {
-                                let #ident: #typ = if version >= #since_val {
-                                    <#typ as rapira::Rapira>::from_slice_versioned(slice, version)?
+                                let #ident: #typ = if __rapira_version >= #since_val {
+                                    <#typ as rapira::Rapira>::from_slice_versioned(__rapira_slice, __rapira_version)?
                                 } else {
                                     Default::default()
                                 };
@@ -129,12 +129,12 @@ pub fn struct_serializer(
                     match with_attr {
                         Some(with_attr) => {
                             from_slice_versioned.push(quote! {
-                                let #ident: #typ = #with_attr::from_slice(slice)?;
+                                let #ident: #typ = #with_attr::from_slice(__rapira_slice)?;
                             });
                         }
                         None => {
                             from_slice_versioned.push(quote! {
-                                let #ident = <#typ as rapira::Rapira>::from_slice_versioned(slice, version)?;
+                                let #ident = <#typ as rapira::Rapira>::from_slice_versioned(__rapira_slice, __rapira_version)?;
                             });
                         }
                     }
@@ -155,15 +155,15 @@ pub fn struct_serializer(
                             }) },
                         );
                         check_bytes.push(quote! {
-                            #with_attr::check_bytes(core::marker::PhantomData::<#typ>, slice)?;
+                            #with_attr::check_bytes(core::marker::PhantomData::<#typ>, __rapira_slice)?;
                         });
                         from_slice.push(quote! {
-                            let #ident: #typ = #with_attr::from_slice(slice)?;
+                            let #ident: #typ = #with_attr::from_slice(__rapira_slice)?;
                         });
                         debug_from_slice.push(quote! {
-                            let len = slice.len();
+                            let len = __rapira_slice.len();
                             println!("Field: {}, Type: {}", stringify!(#ident), stringify!(#typ));
-                            let res = #with_attr::from_slice(slice).inspect(|v| {
+                            let res = #with_attr::from_slice(__rapira_slice).inspect(|v| {
                                 println!("len: {len}, {}: {v:?}", stringify!(#ident));
                             }).inspect_err(|err| {
                                 println!("len: {len}, err: {err:?}");
@@ -171,22 +171,22 @@ pub fn struct_serializer(
                             let #ident: #typ = res?;
                         });
                         from_slice_unchecked.push(quote! {
-                            let #ident: #typ = #with_attr::from_slice_unchecked(slice)?;
+                            let #ident: #typ = #with_attr::from_slice_unchecked(__rapira_slice)?;
                         });
                         from_slice_unsafe.push(quote! {
-                            let #ident: #typ = #with_attr::from_slice_unsafe(slice)?;
+                            let #ident: #typ = #with_attr::from_slice_unsafe(__rapira_slice)?;
                         });
                         try_convert_to_bytes.push(quote! {
-                            #with_attr::try_convert_to_bytes(&self.#ident, slice, cursor)?;
+                            #with_attr::try_convert_to_bytes(&self.#ident, __rapira_slice, __rapira_cursor)?;
                         });
                         convert_to_bytes.push(quote! {
-                            #with_attr::convert_to_bytes(&self.#ident, slice, cursor);
+                            #with_attr::convert_to_bytes(&self.#ident, __rapira_slice, __rapira_cursor);
                         });
                         convert_to_bytes_ctx.push(quote! {
-                            #with_attr::convert_to_bytes(&self.#ident, slice, cursor);
+                            #with_attr::convert_to_bytes(&self.#ident, __rapira_slice, __rapira_cursor);
                         });
                         from_slice_ctx.push(quote! {
-                            let #ident: #typ = #with_attr::from_slice(slice)?;
+                            let #ident: #typ = #with_attr::from_slice(__rapira_slice)?;
                         });
                         size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
                             Some(s) => s,
@@ -195,12 +195,12 @@ pub fn struct_serializer(
                     }
                     None => {
                         from_slice.push(quote! {
-                            let #ident = <#typ as rapira::Rapira>::from_slice(slice)?;
+                            let #ident = <#typ as rapira::Rapira>::from_slice(__rapira_slice)?;
                         });
                         debug_from_slice.push(quote! {
-                            let len = slice.len();
+                            let len = __rapira_slice.len();
                             println!("Field: {}, Type: {}", stringify!(#ident), stringify!(#typ));
-                            let res = <#typ as rapira::Rapira>::from_slice(slice).inspect(|v| {
+                            let res = <#typ as rapira::Rapira>::from_slice(__rapira_slice).inspect(|v| {
                                 println!("len: {len}, {}: {v:?}", stringify!(#ident));
                             }).inspect_err(|err| {
                                 println!("len: {len}, err: {err:?}");
@@ -208,19 +208,19 @@ pub fn struct_serializer(
                             let #ident = res?;
                         });
                         check_bytes.push(quote! {
-                            <#typ as rapira::Rapira>::check_bytes(slice)?;
+                            <#typ as rapira::Rapira>::check_bytes(__rapira_slice)?;
                         });
                         from_slice_unchecked.push(quote! {
-                            let #ident = <#typ as rapira::Rapira>::from_slice_unchecked(slice)?;
+                            let #ident = <#typ as rapira::Rapira>::from_slice_unchecked(__rapira_slice)?;
                         });
                         from_slice_unsafe.push(quote! {
-                            let #ident = <#typ as rapira::Rapira>::from_slice_unsafe(slice)?;
+                            let #ident = <#typ as rapira::Rapira>::from_slice_unsafe(__rapira_slice)?;
                         });
                         try_convert_to_bytes.push(quote! {
-                            self.#ident.try_convert_to_bytes(slice, cursor)?;
+                            self.#ident.try_convert_to_bytes(__rapira_slice, __rapira_cursor)?;
                         });
                         convert_to_bytes.push(quote! {
-                            self.#ident.convert_to_bytes(slice, cursor);
+                            self.#ident.convert_to_bytes(__rapira_slice, __rapira_cursor);
                         });
                         size.push(quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
                             Some(s) => s,
@@ -233,14 +233,14 @@ pub fn struct_serializer(
                             <#typ as rapira::Rapira>::MIN_SIZE,
                         });
                         convert_to_bytes_ctx.push(quote! {
-                            self.#ident.convert_to_bytes_ctx(slice, cursor, flags);
+                            self.#ident.convert_to_bytes_ctx(__rapira_slice, __rapira_cursor, __rapira_flags);
                         });
                         from_slice_ctx.push(quote! {
-                            let #ident = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                            let #ident = <#typ as rapira::Rapira>::from_slice_ctx(__rapira_slice, __rapira_flags)?;
                         });
                         size_ctx.push(quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
                             Some(s) => s,
-                            None => self.#ident.size_ctx(flags)
+                            None => self.#ident.size_ctx(__rapira_flags)
                         }) });
                     }
                 }
@@ -250,11 +250,11 @@ pub fn struct_serializer(
 
             let debug_parse = if is_debug {
                 quote! {
-                    /// Deserializes a value from a byte slice with debug logging.
+                    /// Deserializes a value from a byte __rapira_slice with debug logging.
                     /// This method logs the struct name, field names, types, and values during deserialization.
                     /// Useful for debugging serialization/deserialization issues.
                     #[inline]
-                    fn debug_from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+                    fn debug_from_slice(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                     where
                         Self: Sized + std::fmt::Debug,
                     {
@@ -273,7 +273,7 @@ pub fn struct_serializer(
             let versioned_method = if struct_version.is_some() {
                 quote! {
                     #[inline]
-                    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> rapira::Result<Self>
+                    fn from_slice_versioned(__rapira_slice: &mut &[u8], __rapira_version: u8) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -293,7 +293,7 @@ pub fn struct_serializer(
                     const MIN_SIZE: usize = rapira::min_size(&[#(#min_size)*]);
 
                     #[inline]
-                    fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+                    fn from_slice(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -308,7 +308,7 @@ pub fn struct_serializer(
                     #debug_parse
 
                     #[inline]
-                    fn check_bytes(slice: &mut &[u8]) -> rapira::Result<()>
+                    fn check_bytes(__rapira_slice: &mut &[u8]) -> rapira::Result<()>
                     where
                         Self: Sized,
                     {
@@ -317,7 +317,7 @@ pub fn struct_serializer(
                     }
 
                     #[inline]
-                    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> rapira::Result<Self>
+                    unsafe fn from_slice_unchecked(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -328,7 +328,7 @@ pub fn struct_serializer(
                     }
 
                     #[inline]
-                    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> rapira::Result<Self>
+                    unsafe fn from_slice_unsafe(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -339,13 +339,13 @@ pub fn struct_serializer(
                     }
 
                     #[inline]
-                    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> rapira::Result<()> {
+                    fn try_convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) -> rapira::Result<()> {
                         #(#try_convert_to_bytes)*
                         Ok(())
                     }
 
                     #[inline]
-                    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+                    fn convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) {
                         #(#convert_to_bytes)*
                     }
 
@@ -355,12 +355,12 @@ pub fn struct_serializer(
                     }
 
                     #[inline]
-                    fn convert_to_bytes_ctx(&self, slice: &mut [u8], cursor: &mut usize, flags: rapira::RapiraFlags) {
+                    fn convert_to_bytes_ctx(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize, __rapira_flags: rapira::RapiraFlags) {
                         #(#convert_to_bytes_ctx)*
                     }
 
                     #[inline]
-                    fn from_slice_ctx(slice: &mut &[u8], flags: rapira::RapiraFlags) -> rapira::Result<Self>
+                    fn from_slice_ctx(__rapira_slice: &mut &[u8], __rapira_flags: rapira::RapiraFlags) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -371,7 +371,7 @@ pub fn struct_serializer(
                     }
 
                     #[inline]
-                    fn size_ctx(&self, flags: rapira::RapiraFlags) -> usize {
+                    fn size_ctx(&self, __rapira_flags: rapira::RapiraFlags) -> usize {
                         0 #(#size_ctx)*
                     }
                 }
@@ -436,8 +436,8 @@ pub fn struct_serializer(
                     match &with_attr {
                         Some(with_attr) => {
                             from_slice_versioned.push(quote! {
-                                let #field_name: #typ = if version >= #since_val {
-                                    #with_attr::from_slice(slice)?
+                                let #field_name: #typ = if __rapira_version >= #since_val {
+                                    #with_attr::from_slice(__rapira_slice)?
                                 } else {
                                     Default::default()
                                 };
@@ -445,8 +445,8 @@ pub fn struct_serializer(
                         }
                         None => {
                             from_slice_versioned.push(quote! {
-                                let #field_name: #typ = if version >= #since_val {
-                                    <#typ as rapira::Rapira>::from_slice_versioned(slice, version)?
+                                let #field_name: #typ = if __rapira_version >= #since_val {
+                                    <#typ as rapira::Rapira>::from_slice_versioned(__rapira_slice, __rapira_version)?
                                 } else {
                                     Default::default()
                                 };
@@ -457,12 +457,12 @@ pub fn struct_serializer(
                     match &with_attr {
                         Some(with_attr) => {
                             from_slice_versioned.push(quote! {
-                                let #field_name: #typ = #with_attr::from_slice(slice)?;
+                                let #field_name: #typ = #with_attr::from_slice(__rapira_slice)?;
                             });
                         }
                         None => {
                             from_slice_versioned.push(quote! {
-                                let #field_name = <#typ as rapira::Rapira>::from_slice_versioned(slice, version)?;
+                                let #field_name = <#typ as rapira::Rapira>::from_slice_versioned(__rapira_slice, __rapira_version)?;
                             });
                         }
                     }
@@ -483,15 +483,15 @@ pub fn struct_serializer(
                             }) },
                         );
                         check_bytes.push(quote! {
-                            #with_attr::check_bytes(core::marker::PhantomData::<#typ>, slice)?;
+                            #with_attr::check_bytes(core::marker::PhantomData::<#typ>, __rapira_slice)?;
                         });
                         from_slice.push(quote! {
-                            let #field_name: #typ = #with_attr::from_slice(slice)?;
+                            let #field_name: #typ = #with_attr::from_slice(__rapira_slice)?;
                         });
                         debug_from_slice.push(quote! {
-                            let len = slice.len();
+                            let len = __rapira_slice.len();
                             println!("Field: unnamed (index {}), Type: {}", #idx, stringify!(#typ));
-                            let res = #with_attr::from_slice(slice).inspect(|v| {
+                            let res = #with_attr::from_slice(__rapira_slice).inspect(|v| {
                                 println!("len: {len}, unnamed (index {}): {v:?}", #idx);
                             }).inspect_err(|err| {
                                 println!("len: {len}, err: {err:?}");
@@ -499,22 +499,22 @@ pub fn struct_serializer(
                             let #field_name: #typ = res?;
                         });
                         from_slice_unchecked.push(quote! {
-                            let #field_name: #typ = #with_attr::from_slice_unchecked(slice)?;
+                            let #field_name: #typ = #with_attr::from_slice_unchecked(__rapira_slice)?;
                         });
                         from_slice_unsafe.push(quote! {
-                            let #field_name: #typ = #with_attr::from_slice_unsafe(slice)?;
+                            let #field_name: #typ = #with_attr::from_slice_unsafe(__rapira_slice)?;
                         });
                         try_convert_to_bytes.push(quote! {
-                            #with_attr::try_convert_to_bytes(&self.#id, slice, cursor)?;
+                            #with_attr::try_convert_to_bytes(&self.#id, __rapira_slice, __rapira_cursor)?;
                         });
                         convert_to_bytes.push(quote! {
-                            #with_attr::convert_to_bytes(&self.#id, slice, cursor);
+                            #with_attr::convert_to_bytes(&self.#id, __rapira_slice, __rapira_cursor);
                         });
                         convert_to_bytes_ctx.push(quote! {
-                            #with_attr::convert_to_bytes(&self.#id, slice, cursor);
+                            #with_attr::convert_to_bytes(&self.#id, __rapira_slice, __rapira_cursor);
                         });
                         from_slice_ctx.push(quote! {
-                            let #field_name: #typ = #with_attr::from_slice(slice)?;
+                            let #field_name: #typ = #with_attr::from_slice(__rapira_slice)?;
                         });
                         size_ctx.push(quote! { + (match #with_attr::static_size(core::marker::PhantomData::<#typ>) {
                             Some(s) => s,
@@ -523,12 +523,12 @@ pub fn struct_serializer(
                     }
                     None => {
                         from_slice.push(quote! {
-                            let #field_name = <#typ as rapira::Rapira>::from_slice(slice)?;
+                            let #field_name = <#typ as rapira::Rapira>::from_slice(__rapira_slice)?;
                         });
                         debug_from_slice.push(quote! {
-                            let len = slice.len();
+                            let len = __rapira_slice.len();
                             println!("Field: unnamed (index {}), Type: {}", #idx, stringify!(#typ));
-                            let res = <#typ as rapira::Rapira>::from_slice(slice).inspect(|v| {
+                            let res = <#typ as rapira::Rapira>::from_slice(__rapira_slice).inspect(|v| {
                                 println!("len: {len}, unnamed (index {}): {v:?}", #idx);
                             }).inspect_err(|err| {
                                 println!("len: {len}, err: {err:?}");
@@ -536,19 +536,19 @@ pub fn struct_serializer(
                             let #field_name = res?;
                         });
                         check_bytes.push(quote! {
-                            <#typ as rapira::Rapira>::check_bytes(slice)?;
+                            <#typ as rapira::Rapira>::check_bytes(__rapira_slice)?;
                         });
                         from_slice_unchecked.push(quote! {
-                            let #field_name = <#typ as rapira::Rapira>::from_slice_unchecked(slice)?;
+                            let #field_name = <#typ as rapira::Rapira>::from_slice_unchecked(__rapira_slice)?;
                         });
                         from_slice_unsafe.push(quote! {
-                            let #field_name = <#typ as rapira::Rapira>::from_slice_unsafe(slice)?;
+                            let #field_name = <#typ as rapira::Rapira>::from_slice_unsafe(__rapira_slice)?;
                         });
                         try_convert_to_bytes.push(quote! {
-                            self.#id.try_convert_to_bytes(slice, cursor)?;
+                            self.#id.try_convert_to_bytes(__rapira_slice, __rapira_cursor)?;
                         });
                         convert_to_bytes.push(quote! {
-                            self.#id.convert_to_bytes(slice, cursor);
+                            self.#id.convert_to_bytes(__rapira_slice, __rapira_cursor);
                         });
                         size.push(quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
                             Some(s) => s,
@@ -561,14 +561,14 @@ pub fn struct_serializer(
                             <#typ as rapira::Rapira>::MIN_SIZE,
                         });
                         convert_to_bytes_ctx.push(quote! {
-                            self.#id.convert_to_bytes_ctx(slice, cursor, flags);
+                            self.#id.convert_to_bytes_ctx(__rapira_slice, __rapira_cursor, __rapira_flags);
                         });
                         from_slice_ctx.push(quote! {
-                            let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(slice, flags)?;
+                            let #field_name = <#typ as rapira::Rapira>::from_slice_ctx(__rapira_slice, __rapira_flags)?;
                         });
                         size_ctx.push(quote! { + (match <#typ as rapira::Rapira>::STATIC_SIZE {
                             Some(s) => s,
-                            None => self.#id.size_ctx(flags)
+                            None => self.#id.size_ctx(__rapira_flags)
                         }) });
                     }
                 }
@@ -578,11 +578,11 @@ pub fn struct_serializer(
 
             let debug_parse = if is_debug {
                 quote! {
-                    /// Deserializes a value from a byte slice with debug logging.
+                    /// Deserializes a value from a byte __rapira_slice with debug logging.
                     /// This method logs the struct name, field indices, types, and values during deserialization.
                     /// Useful for debugging serialization/deserialization issues.
                     #[inline]
-                    fn debug_from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+                    fn debug_from_slice(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                     where
                         Self: Sized + std::fmt::Debug,
                     {
@@ -598,7 +598,7 @@ pub fn struct_serializer(
             let versioned_method = if struct_version.is_some() {
                 quote! {
                     #[inline]
-                    fn from_slice_versioned(slice: &mut &[u8], version: u8) -> rapira::Result<Self>
+                    fn from_slice_versioned(__rapira_slice: &mut &[u8], __rapira_version: u8) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -616,7 +616,7 @@ pub fn struct_serializer(
                     const MIN_SIZE: usize = rapira::min_size(&[#(#min_size)*]);
 
                     #[inline]
-                    fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+                    fn from_slice(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -629,7 +629,7 @@ pub fn struct_serializer(
                     #debug_parse
 
                     #[inline]
-                    fn check_bytes(slice: &mut &[u8]) -> rapira::Result<()>
+                    fn check_bytes(__rapira_slice: &mut &[u8]) -> rapira::Result<()>
                     where
                         Self: Sized,
                     {
@@ -638,7 +638,7 @@ pub fn struct_serializer(
                     }
 
                     #[inline]
-                    unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> rapira::Result<Self>
+                    unsafe fn from_slice_unchecked(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -647,7 +647,7 @@ pub fn struct_serializer(
                     }
 
                     #[inline]
-                    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> rapira::Result<Self>
+                    unsafe fn from_slice_unsafe(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -656,13 +656,13 @@ pub fn struct_serializer(
                     }
 
                     #[inline]
-                    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> rapira::Result<()> {
+                    fn try_convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) -> rapira::Result<()> {
                         #(#try_convert_to_bytes)*
                         Ok(())
                     }
 
                     #[inline]
-                    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
+                    fn convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) {
                         #(#convert_to_bytes)*
                     }
 
@@ -670,12 +670,12 @@ pub fn struct_serializer(
                     fn size(&self) -> usize { 0 #(#size)* }
 
                     #[inline]
-                    fn convert_to_bytes_ctx(&self, slice: &mut [u8], cursor: &mut usize, flags: rapira::RapiraFlags) {
+                    fn convert_to_bytes_ctx(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize, __rapira_flags: rapira::RapiraFlags) {
                         #(#convert_to_bytes_ctx)*
                     }
 
                     #[inline]
-                    fn from_slice_ctx(slice: &mut &[u8], flags: rapira::RapiraFlags) -> rapira::Result<Self>
+                    fn from_slice_ctx(__rapira_slice: &mut &[u8], __rapira_flags: rapira::RapiraFlags) -> rapira::Result<Self>
                     where
                         Self: Sized,
                     {
@@ -684,7 +684,7 @@ pub fn struct_serializer(
                     }
 
                     #[inline]
-                    fn size_ctx(&self, flags: rapira::RapiraFlags) -> usize {
+                    fn size_ctx(&self, __rapira_flags: rapira::RapiraFlags) -> usize {
                         0 #(#size_ctx)*
                     }
                 }
@@ -698,7 +698,7 @@ pub fn struct_serializer(
                 const MIN_SIZE: usize = 0;
 
                 #[inline]
-                fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+                fn from_slice(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                 where
                     Self: Sized,
                 {
@@ -706,7 +706,7 @@ pub fn struct_serializer(
                 }
 
                 #[inline]
-                fn check_bytes(slice: &mut &[u8]) -> rapira::Result<()>
+                fn check_bytes(__rapira_slice: &mut &[u8]) -> rapira::Result<()>
                 where
                     Self: Sized,
                 {
@@ -714,7 +714,7 @@ pub fn struct_serializer(
                 }
 
                 #[inline]
-                unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> rapira::Result<Self>
+                unsafe fn from_slice_unchecked(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                 where
                     Self: Sized,
                 {
@@ -722,7 +722,7 @@ pub fn struct_serializer(
                 }
 
                 #[inline]
-                unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> rapira::Result<Self>
+                unsafe fn from_slice_unsafe(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
                 where
                     Self: Sized,
                 {
@@ -730,12 +730,12 @@ pub fn struct_serializer(
                 }
 
                 #[inline]
-                fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> rapira::Result<()> {
+                fn try_convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) -> rapira::Result<()> {
                     Ok(())
                 }
 
                 #[inline]
-                fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {}
+                fn convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) {}
 
                 #[inline]
                 fn size(&self) -> usize { 0 }

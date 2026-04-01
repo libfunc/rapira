@@ -12,51 +12,51 @@ pub fn simple_enum_serializer(name: &Ident) -> proc_macro::TokenStream {
             const MIN_SIZE: usize = 1;
 
             #[inline]
-            fn from_slice(slice: &mut &[u8]) -> rapira::Result<Self>
+            fn from_slice(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
             where
                 Self: Sized,
             {
-                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice(__rapira_slice)?;
                 <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)
             }
 
             #[inline]
-            fn check_bytes(slice: &mut &[u8]) -> rapira::Result<()>
+            fn check_bytes(__rapira_slice: &mut &[u8]) -> rapira::Result<()>
             where
                 Self: Sized,
             {
-                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice(__rapira_slice)?;
                 <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)?;
                 Ok(())
             }
 
             #[inline]
-            unsafe fn from_slice_unchecked(slice: &mut &[u8]) -> rapira::Result<Self>
+            unsafe fn from_slice_unchecked(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
             where
                 Self: Sized,
             {
-                let val: u8 = rapira::byte_rapira::from_slice(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice(__rapira_slice)?;
                 <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)
             }
 
             #[inline]
-            unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> rapira::Result<Self>
+            unsafe fn from_slice_unsafe(__rapira_slice: &mut &[u8]) -> rapira::Result<Self>
             where
                 Self: Sized,
             {
-                let val: u8 = rapira::byte_rapira::from_slice_unsafe(slice)?;
+                let val: u8 = rapira::byte_rapira::from_slice_unsafe(__rapira_slice)?;
                 <Self as core::convert::TryFrom<u8>>::try_from(val).map_err(|_| rapira::RapiraError::EnumVariant)
             }
 
             #[inline]
-            fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> rapira::Result<()> {
-                rapira::push(slice, cursor, *self as u8);
+            fn try_convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) -> rapira::Result<()> {
+                rapira::push(__rapira_slice, __rapira_cursor, *self as u8);
                 Ok(())
             }
 
             #[inline]
-            fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-                rapira::push(slice, cursor, *self as u8);
+            fn convert_to_bytes(&self, __rapira_slice: &mut [u8], __rapira_cursor: &mut usize) {
+                rapira::push(__rapira_slice, __rapira_cursor, *self as u8);
             }
             #[inline]
             fn size(&self) -> usize { 1 }
