@@ -24,10 +24,11 @@ pub use primitive::{byte_rapira, bytes_rapira, str_rapira};
 extern crate alloc;
 
 pub use funcs::{
-    check_bytes, deser_unchecked, deser_unsafe, deserialize, deserialize_versioned, size,
+    check_bytes, deser_unchecked, deser_unsafe, deserialize, deserialize_ctx,
+    deserialize_versioned, size, size_ctx,
 };
 #[cfg(feature = "alloc")]
-pub use funcs::{extend_vec, serialize};
+pub use funcs::{extend_vec, serialize, serialize_ctx};
 pub use rapira_derive::{FromU8, PrimitiveFromEnum, Rapira};
 
 /// Bitflags for context-aware serialization.

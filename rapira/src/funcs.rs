@@ -1,4 +1,4 @@
-use crate::{Rapira, Result};
+use crate::{Rapira, RapiraFlags, Result};
 
 #[inline]
 pub fn size<T: Rapira>(item: &T) -> usize {
@@ -133,4 +133,26 @@ where
     T: Rapira + Sized,
 {
     unsafe { T::from_slice_unsafe(&mut bytes) }
+}
+
+#[inline]
+pub fn size_ctx<T: Rapira>(item: &T, flags: RapiraFlags) -> usize {
+    match T::STATIC_SIZE {
+        Some(s) => s,
+        None => item.size_ctx(flags),
+    }
+}
+
+/// Serialize with context flags.
+#[cfg(feature = "alloc")]
+pub fn serialize_ctx<T: Rapira>(item: &T, flags: RapiraFlags) -> Vec<u8> {
+    let value_size = size_ctx(item, flags);
+    let mut bytes: Vec<u8> = vec![0u8; value_size];
+    item.convert_to_bytes_ctx(&mut bytes, &mut 0, flags);
+    bytes
+}
+
+/// Deserialize with context flags.
+pub fn deserialize_ctx<T: Rapira + Sized>(mut bytes: &[u8], flags: RapiraFlags) -> Result<T> {
+    T::from_slice_ctx(&mut bytes, flags)
 }
