@@ -548,63 +548,6 @@ impl crate::Rapira for fjall::Slice {
     }
 }
 
-#[cfg(feature = "inline-array")]
-impl crate::Rapira for inline_array::InlineArray {
-    const MIN_SIZE: usize = crate::LEN_SIZE;
-
-    #[inline]
-    fn size(&self) -> usize {
-        use crate::bytes_rapira;
-
-        bytes_rapira::size(self)
-    }
-
-    #[inline]
-    fn check_bytes(slice: &mut &[u8]) -> crate::Result<()> {
-        use crate::bytes_rapira;
-
-        bytes_rapira::check_bytes::<()>(core::marker::PhantomData, slice)
-    }
-
-    #[inline]
-    fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) {
-        use crate::bytes_rapira;
-
-        bytes_rapira::convert_to_bytes(self, slice, cursor);
-    }
-
-    #[inline]
-    fn try_convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize) -> crate::Result<()> {
-        use crate::bytes_rapira;
-
-        bytes_rapira::try_convert_to_bytes(self, slice, cursor)
-    }
-
-    #[inline]
-    fn from_slice(slice: &mut &[u8]) -> crate::Result<Self>
-    where
-        Self: Sized,
-    {
-        use crate::bytes_rapira;
-
-        let bytes = bytes_rapira::from_slice(slice)?;
-        Ok(Self::from(bytes))
-    }
-
-    #[inline]
-    unsafe fn from_slice_unsafe(slice: &mut &[u8]) -> crate::Result<Self>
-    where
-        Self: Sized,
-    {
-        use crate::bytes_rapira;
-
-        unsafe {
-            let bytes = bytes_rapira::from_slice_unsafe(slice)?;
-            Ok(Self::from(bytes))
-        }
-    }
-}
-
 #[cfg(feature = "zerocopy")]
 pub mod zero {
     use core::{marker::PhantomData, mem::size_of};
