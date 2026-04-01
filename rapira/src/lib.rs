@@ -30,6 +30,30 @@ pub use funcs::{
 pub use funcs::{extend_vec, serialize};
 pub use rapira_derive::{FromU8, PrimitiveFromEnum, Rapira};
 
+/// Bitflags for context-aware serialization.
+/// Bits 0–7 are reserved for rapira. External crates use bits 8+.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct RapiraFlags(pub u64);
+
+impl RapiraFlags {
+    pub const NONE: Self = Self(0);
+
+    #[inline]
+    pub const fn new(flags: u64) -> Self {
+        Self(flags)
+    }
+
+    #[inline]
+    pub const fn has(self, flag: u64) -> bool {
+        self.0 & flag != 0
+    }
+
+    #[inline]
+    pub const fn with(self, flag: u64) -> Self {
+        Self(self.0 | flag)
+    }
+}
+
 pub trait Rapira {
     const STATIC_SIZE: Option<usize> = None;
     const MIN_SIZE: usize;
@@ -145,6 +169,27 @@ pub trait Rapira {
     }
 
     fn convert_to_bytes(&self, slice: &mut [u8], cursor: &mut usize);
+
+    /// Context-aware serialization. Default: delegates to `convert_to_bytes`.
+    #[inline]
+    fn convert_to_bytes_ctx(&self, slice: &mut [u8], cursor: &mut usize, _flags: RapiraFlags) {
+        self.convert_to_bytes(slice, cursor)
+    }
+
+    /// Context-aware deserialization. Default: delegates to `from_slice`.
+    #[inline]
+    fn from_slice_ctx(slice: &mut &[u8], _flags: RapiraFlags) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Self::from_slice(slice)
+    }
+
+    /// Context-aware size calculation. Default: delegates to `size`.
+    #[inline]
+    fn size_ctx(&self, _flags: RapiraFlags) -> usize {
+        self.size()
+    }
 }
 
 pub const LEN_SIZE: usize = 4;
