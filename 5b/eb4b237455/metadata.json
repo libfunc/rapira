@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "5beb4b237455",
+  "strategy": "manual-commit",
+  "branch": "feat/rapira-ctx-flags",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "rapira-derive/src/enums.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/5b/eb4b237455/0/metadata.json",
+      "transcript": "/5b/eb4b237455/0/full.jsonl",
+      "content_hash": "/5b/eb4b237455/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 16582,
+    "cache_read_tokens": 5051521,
+    "output_tokens": 6676,
+    "api_call_count": 28
+  }
+}
