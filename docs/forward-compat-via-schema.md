@@ -140,7 +140,7 @@ for my_field in my.fields not seen in peer:
 `skip_value` — интерпретатор-«перематыватель»:
 
 ```text
-fn skip_value(slice: &mut &[u8], ty: &TypeSchema) -> Result<()> {
+fn skip_value(slice: &mut &[u8], ty: &TypeSchema, registry: &Registry) -> Result<()> {
     match ty {
         Static(k)        => advance(slice, k.size()),
         String | Bytes   => { let n = u32::from_slice(slice)?; advance(slice, n) }
